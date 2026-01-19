@@ -1,0 +1,32 @@
+import React from "react";
+import { NavigationContainer } from "@react-navigation/native";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import ErrorBoundary from "./src/components/ErrorBoundary";
+
+import IntroScreen from "./src/screens/IntroScreen";
+import SignInScreen from "./src/screens/SignInScreen";
+import SignUpScreen from "./src/screens/SignUp";
+
+const Stack = createNativeStackNavigator();
+
+export default function App() {
+  try {
+    return (
+      <ErrorBoundary>
+        <NavigationContainer>
+          <Stack.Navigator 
+            initialRouteName="Intro"
+            screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Intro" component={IntroScreen} />
+            <Stack.Screen name="SignIn" component={SignInScreen} />
+            <Stack.Screen name="SignUp" component={SignUpScreen} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </ErrorBoundary>
+    );
+  } catch (error) {
+    console.error('App initialization error:', error);
+    // Fallback to simple screen if NavigationContainer fails
+    return <SignInScreen />;
+  }
+}

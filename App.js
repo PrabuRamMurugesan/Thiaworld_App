@@ -1,0 +1,341 @@
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createDrawerNavigator } from '@react-navigation/drawer';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { CartProvider } from './src/contexts/CartContext';
+import { WishlistProvider } from './src/contexts/WishlistContext';
+import ErrorBoundary from './src/components/ErrorBoundary';
+import Home from './src/screens/HomeScreen';
+import ProductListings from './src/screens/ProductListing';
+import ProductDetails from './src/screens/ProductDetail';
+import CartPage from './src/screens/CartScreen';
+import Notifications from './src/screens/Notifications';
+import ProfileSettingsScreen from './src/screens/ProfileSettingsScreen';
+import UserAccount from './src/screens/UserAccount';
+import MyWalletStyled from './src/screens/MyWallet';
+import OrderHistory from './src/screens/OrderHistory';
+import JewelryWishlist from './src/screens/Wishlist';
+import GoldExchangeBuyback from './src/screens/GoldExchangeBuyback';
+import SaveCardAndUPI from './src/screens/SaveCardAndUPI';
+import BookStoreVisit from './src/screens/BookStoreVisit';
+import RewardsScreen from './src/screens/RewardsScreen';
+import SavedAddressScreen from './src/screens/SavedAddressScreen';
+import DashboardScreen from './src/screens/Dashboard';
+import FranchiseDashboard from './src/screens/FranchiseHeadScreen';
+import TerritoryDashboardScreen from './src/screens/TerritoryHead';
+import AgentScreen from './src/screens/AgentScreen';
+import VendorDashboard from './src/screens/VendorScreen';
+import BecomeVendorDashboard from './src/screens/BecomeVendorScreen';
+import CheckoutPage from './src/screens/CheckoutScreen';
+import SuccessPage from './src/screens/SuccessPage';
+import IntroScreen from './src/screens/IntroScreen';
+import SignInScreen from './src/screens/SignInScreen';
+import Registration from './src/screens/SignUp';
+import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
+import GoldSilverRatesScreen from './src/screens/GoldSilverRatesScreen';
+import AboutUsScreen from './src/screens/Aboutus';
+import TermsAndConditionsPage from './src/screens/TermsAndConditions';
+import ThiaSecurePlan from './src/screens/ThiaSecurePlan';
+
+// Navigators
+const Stack = createNativeStackNavigator();
+const Drawer = createDrawerNavigator();
+
+/* ------------------ Drawer with Main App ------------------ */
+function MainDrawer() {
+  return (
+    <Drawer.Navigator
+      initialRouteName="Home"
+      screenOptions={{
+        headerShown: true,
+        drawerType: 'front',
+        headerStyle: { backgroundColor: 'black' },
+        headerTintColor: '#fff',
+        drawerStyle: {
+          backgroundColor: '#111',
+          width: 240,
+        },
+        drawerLabelStyle: { color: 'red', fontSize: 16 },
+      }}
+    >
+      <Drawer.Screen name="Home" component={Home}/>
+      <Drawer.Screen name="Products" component={ProductListings} />
+      <Drawer.Screen name="ProductDetails" component={ProductDetails} />
+      <Drawer.Screen name="Cart" component={CartPage} />
+      <Drawer.Screen name="Wishlist" component={JewelryWishlist} />
+      <Drawer.Screen name="Orders" component={OrderHistory} />
+      <Drawer.Screen name="MyWallet" component={MyWalletStyled} />
+      <Drawer.Screen name="Rewards" component={RewardsScreen} />
+      <Drawer.Screen name="Payments" component={SaveCardAndUPI} />
+      <Drawer.Screen name="StoreVisit" component={BookStoreVisit} />
+      <Drawer.Screen name="Exchange" component={GoldExchangeBuyback} />
+      <Drawer.Screen name="Rates" component={GoldSilverRatesScreen} />
+      <Drawer.Screen name="Account" component={UserAccount} />
+      <Drawer.Screen name="Profile" component={ProfileSettingsScreen} />
+      <Drawer.Screen name="Addresses" component={SavedAddressScreen} />
+      <Drawer.Screen name="Dashboard" component={DashboardScreen} />
+      <Drawer.Screen name="Franchise" component={FranchiseDashboard} />
+      <Drawer.Screen name="Territory" component={TerritoryDashboardScreen} />
+      <Drawer.Screen name="Agent" component={AgentScreen} />
+      <Drawer.Screen name="Vendor" component={VendorDashboard} />
+      <Drawer.Screen name="BecomeAVendor" component={BecomeVendorDashboard} />
+      <Drawer.Screen name="Notifications" component={Notifications} />
+      <Drawer.Screen name="AboutUs" component={AboutUsScreen} />
+      <Drawer.Screen name="Terms" component={TermsAndConditionsPage} />
+      <Drawer.Screen name="Checkout" component={CheckoutPage} />
+      <Drawer.Screen name="Success" component={SuccessPage} />
+    </Drawer.Navigator>
+  );
+}
+
+/* ------------------ Auth Stack ------------------ */
+function AuthStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: true}}>
+      <Stack.Screen name="Intro" component={IntroScreen}  options={{ headerShown: false }} />
+      <Stack.Screen name="SignIn" component={SignInScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="SignUp" component={Registration} options={{ headerShown: false }} />
+    <Stack.Screen
+    name="ForgotPassword"
+    component={ForgotPasswordScreen}
+    options={{
+    title: 'Forgot Password',
+    headerTitleAlign: 'center',   // center text
+  }}
+/>
+
+    </Stack.Navigator>
+  );
+}
+export default function App() {
+  console.log('📱 App component rendering...');
+  
+  return (
+    <ErrorBoundary>
+      <WishlistProvider>
+        <CartProvider>
+          <NavigationContainer>
+         <Stack.Navigator screenOptions={{ headerShown: true }}>
+           
+           {/* Auth Flow */}
+          <Stack.Screen name="Welcome" component={AuthStack}  
+          options={{ headerShown: false }}/>
+
+          {/* Drawer Main App */}
+          <Stack.Screen name="Main" component={MainDrawer}   />
+
+          
+          <Stack.Screen
+            name="Intro"
+            component={IntroScreen}
+             options={{
+              title: '',
+              headerTitleAlign: 'center',
+              headerTitleStyle: {
+                fontWeight: 'bold',
+                fontSize: 20,
+                color: 'white',
+              },
+              headerStyle: {
+                backgroundColor: 'black',
+              },
+            }}
+          />
+
+          <Stack.Screen
+            name="SignUp"
+            component={Registration}
+            options={{ title: 'Sign Up' }}
+          />
+
+            <Stack.Screen
+            name="ThiaSecurePlan"
+            component={ThiaSecurePlan}
+            options={{ title: 'Thia Secure Plan' }}
+          />
+
+          <Stack.Screen
+            name="SignIn"
+            component={SignInScreen}
+            options={{ title: 'Sign In' }}
+          />
+           
+          <Stack.Screen
+            name="ForgotPassword"
+            component={ForgotPasswordScreen}
+            options={{ title: 'Forgot Password' }}
+          />
+          <Stack.Screen
+            name="Home"
+            component={Home}
+            options={{
+              title: 'Thiaworld Jewellery',
+              headerTitleAlign: 'center',
+              headerTitleStyle: {
+                fontWeight: 'bold',
+                fontSize: 20,
+                color: 'black',
+              },
+              headerStyle: {
+                backgroundColor: 'white',
+              },
+            }}
+          />
+
+          <Stack.Screen
+            name="Products"
+            component={ProductListings}
+            options={{ title: 'Product Listings' }}
+          />
+
+          <Stack.Screen
+            name="ProductDetails"
+            component={ProductDetails}
+            options={{ title: 'Product Details' }}
+          />
+
+          <Stack.Screen
+            name="Cart"
+            component={CartPage}
+            options={{ title: 'My Cart' }}
+          />
+
+          <Stack.Screen
+            name="Notifications"
+            component={Notifications}
+            options={{ title: 'Notifications' }}
+          />
+
+          <Stack.Screen
+            name="Account"
+            component={UserAccount}
+            options={{ title: 'Account' }}
+          />
+
+          <Stack.Screen
+            name='MyWallet'
+            component={MyWalletStyled}
+            options={{ title: 'My Wallet' }}
+          />
+          <Stack.Screen
+            name="Profile"
+            component={ProfileSettingsScreen}
+            options={{ title: 'Profile' }}
+          />
+          <Stack.Screen
+            name="Orders"
+            component={OrderHistory}
+            options={{ title: 'Order History' }}
+          />
+
+          <Stack.Screen
+            name="Wishlist"
+            component={JewelryWishlist}
+            options={{ title: 'My Wishlist' }}
+          />
+
+          <Stack.Screen
+            name="Exchange"
+            component={GoldExchangeBuyback}
+            options={{ title: 'Gold Exchange Buy ' }}
+          />
+
+          <Stack.Screen
+            name="Payments"
+            component={SaveCardAndUPI}
+            options={{ title: 'My Bank Account ' }}
+          />
+
+          <Stack.Screen
+            name="StoreVisit"
+            component={BookStoreVisit}
+            options={{ title: 'Book Store Visit ' }}
+          />
+
+          <Stack.Screen
+            name="Rewards"
+            component={RewardsScreen}
+            options={{ title: 'Exclusive Offers' }}
+          />
+          <Stack.Screen
+            name="ProfileSettings"
+            component={ProfileSettingsScreen}
+            options={{ title: 'Profile Settings' }}
+          />
+
+          <Stack.Screen
+            name="Addresses"
+            component={SavedAddressScreen}
+            options={{ title: 'My Address' }}
+          />
+          
+           <Stack.Screen
+            name="Ratings"
+            component={GoldSilverRatesScreen}
+            options={{ title: 'Gold & Silver Ranges' }}
+          />
+          <Stack.Screen
+            name="Dashboard"
+            component={DashboardScreen}
+            options={{ title: 'Dashboard' }}
+          />
+          <Stack.Screen
+            name="Franchise"
+            component={FranchiseDashboard}
+            options={{ title: 'Franchise Dashboard' }}
+          />
+
+          <Stack.Screen
+            name="Territory"
+            component={TerritoryDashboardScreen}
+            options={{ title: 'Territory Dashboard' }}
+          />
+
+          <Stack.Screen
+            name="Agent"
+            component={AgentScreen}
+            options={{ title: 'Agent Dashboard' }}
+          />
+
+          <Stack.Screen
+            name="Vendor"
+            component={VendorDashboard}
+            options={{ title: 'Vendor Dashboard' }}
+          />
+
+          <Stack.Screen
+            name="BecomeAVendor"
+            component={BecomeVendorDashboard}
+            options={{ title: 'Become A Vendor Dashboard' }}
+          />
+
+          <Stack.Screen
+            name="Checkout"
+            component={CheckoutPage}
+            options={{ title: 'Checkout' }}
+          />
+          
+              <Stack.Screen
+            name="AboutUs"
+            component={AboutUsScreen}
+            options={{ title: 'About Us' }}
+          />
+
+            <Stack.Screen
+            name="TermsAndConditions"
+            component={TermsAndConditionsPage}
+            options={{ title: 'Terms And Conditions' }}
+          />
+
+          <Stack.Screen
+            name="Success"
+            component={SuccessPage}
+            options={{ title: 'Successfully' }}
+          />
+        </Stack.Navigator>
+      </NavigationContainer>
+        </CartProvider>
+      </WishlistProvider>
+    </ErrorBoundary>
+  );
+}
