@@ -21,29 +21,47 @@ export const WishlistProvider = ({ children }) => {
 
     const loadWishlist = useCallback(async () => {
         try {
+            // ✅ Check for token (try both THIAWORLD_TOKEN and bbsUser)
             const token = await AsyncStorage.getItem('THIAWORLD_TOKEN');
+            const bbsUserRaw = await AsyncStorage.getItem('bbsUser');
+            const hasToken = token || (bbsUserRaw && JSON.parse(bbsUserRaw)?.token);
 
-            if (!token) {
+            if (!hasToken) {
                 setWishlistIds(new Set());
                 setLoading(false);
                 return;
             }
 
-            // getWishlist doesn't take parameters - it gets token internally
-            // But it looks for 'bbsUser' in AsyncStorage, so we need to handle this
             const res = await getWishlist();
 
+            // ✅ Handle different response structures
+            let items = [];
+            if (Array.isArray(res)) {
+                items = res;
+            } else if (res?.items && Array.isArray(res.items)) {
+                items = res.items;
+            } else if (res?.data && Array.isArray(res.data)) {
+                items = res.data;
+            }
+
             const ids = new Set(
-                (res || []).map((item) =>
-                    item.productId?._id || item.productId || item._id
-                )
+                items.map((item) => {
+                    // Handle different item structures
+                    const productId = item.productId?._id || 
+                                    item.productId || 
+                                    item.product?._id ||
+                                    item.product ||
+                                    item._id ||
+                                    item.id;
+                    return String(productId); // Ensure string for consistency
+                }).filter(Boolean) // Remove any null/undefined values
             );
 
             setWishlistIds(ids);
         } catch (err) {
             console.log('Wishlist load error', err);
-            // Don't crash if wishlist fails to load
-            setWishlistIds(new Set());
+            // ✅ Don't clear wishlist on error - keep current state
+            // setWishlistIds(new Set());
         } finally {
             setLoading(false);
         }
@@ -57,7 +75,8 @@ export const WishlistProvider = ({ children }) => {
 
     const isWishlisted = useCallback(
         (productId) => {
-            return wishlistIds.has(productId);
+            // ✅ Ensure consistent string comparison
+            return wishlistIds.has(String(productId));
         },
         [wishlistIds]
     );
@@ -65,28 +84,65 @@ export const WishlistProvider = ({ children }) => {
     /* ================= TOGGLE ================= */
 
     const toggleWishlist = async (productId) => {
+        // ✅ Ensure productId is string for consistency
+        const productIdStr = String(productId);
+        
+        // ✅ Save current state before making changes (for error rollback)
+        const wasWishlisted = wishlistIds.has(productIdStr);
+        
         try {
+            // ✅ Check for token (try both THIAWORLD_TOKEN and bbsUser)
             const token = await AsyncStorage.getItem('THIAWORLD_TOKEN');
+            const bbsUserRaw = await AsyncStorage.getItem('bbsUser');
+            const hasToken = token || (bbsUserRaw && JSON.parse(bbsUserRaw)?.token);
 
-            if (!token) return;
+            if (!hasToken) {
+                // User not logged in - could show alert here if needed
+                console.log('User not logged in - cannot add to wishlist');
+                return;
+            }
 
-            // Optimistic UI update
+            // ✅ Optimistic UI update
             setWishlistIds((prev) => {
                 const updated = new Set(prev);
-                if (updated.has(productId)) {
-                    updated.delete(productId);
+                if (updated.has(productIdStr)) {
+                    updated.delete(productIdStr);
                 } else {
-                    updated.add(productId);
+                    updated.add(productIdStr);
                 }
                 return updated;
             });
 
-            // toggleWishlistAPI doesn't take token parameter - it gets it internally
-            await toggleWishlistAPI(productId);
+            // Call API to toggle wishlist
+            await toggleWishlistAPI(productIdStr);
+            
+            // ✅ Wait a bit before reloading to give backend time to update
+            // Then reload wishlist to ensure sync with backend
+            setTimeout(async () => {
+                try {
+                    await loadWishlist();
+                } catch (reloadErr) {
+                    console.log('Wishlist reload after toggle error:', reloadErr);
+                    // If reload fails, keep the optimistic update
+                }
+            }, 500); // 500ms delay
+            
         } catch (err) {
             console.log('Wishlist toggle error', err);
-            // Reload from backend if something goes wrong
-            loadWishlist();
+            // ✅ Revert optimistic update on error
+            setWishlistIds((prev) => {
+                const updated = new Set(prev);
+                if (wasWishlisted) {
+                    // Was wishlisted, so add it back
+                    updated.add(productIdStr);
+                } else {
+                    // Was not wishlisted, so remove it
+                    updated.delete(productIdStr);
+                }
+                return updated;
+            });
+            
+            // Don't reload on error - keep current state
         }
     };
 

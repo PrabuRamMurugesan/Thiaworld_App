@@ -10,6 +10,8 @@ import {
   Image,
   StyleSheet,
   StatusBar,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import axios from "axios";
@@ -26,6 +28,8 @@ const Registration = () => {
   const [referralCode, setReferralCode] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
 
@@ -114,8 +118,17 @@ const Registration = () => {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <StatusBar backgroundColor="#8B6C42" barStyle="light-content" />
+    <KeyboardAvoidingView
+      style={styles.keyboardView}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
+      <ScrollView 
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <StatusBar backgroundColor="#8B6C42" barStyle="light-content" />
 
       {/* Logo + Title */}
       <View style={styles.header}>
@@ -175,24 +188,40 @@ const Registration = () => {
 
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Password</Text>
-          <TextInput
-            placeholder="Create a password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            style={styles.input}
-          />
+          <View style={styles.passwordContainer}>
+            <TextInput
+              placeholder="Create a password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              style={styles.passwordInput}
+            />
+            <TouchableOpacity
+              onPress={() => setShowPassword(!showPassword)}
+              style={styles.eyeIcon}
+            >
+              <Text style={styles.eyeIconText}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Confirm Password</Text>
-          <TextInput
-            placeholder="Confirm your password"
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            secureTextEntry
-            style={styles.input}
-          />
+          <View style={styles.passwordContainer}>
+            <TextInput
+              placeholder="Confirm your password"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry={!showConfirmPassword}
+              style={styles.passwordInput}
+            />
+            <TouchableOpacity
+              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+              style={styles.eyeIcon}
+            >
+              <Text style={styles.eyeIconText}>{showConfirmPassword ? '👁️' : '👁️‍🗨️'}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.inputGroup}>
@@ -225,16 +254,21 @@ const Registration = () => {
           <ActivityIndicator size="large" color="#8B6C42" />
         </View>
       )}
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 // Styles remain 100% SAME
 const styles = StyleSheet.create({
+  keyboardView: {
+    flex: 1,
+  },
   container: {
     flexGrow: 1,
     backgroundColor: '#FDF8F4',
     padding: 20,
+    paddingBottom: 100,
     justifyContent: 'center',
   },
   header: {
@@ -286,6 +320,30 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#333',
     backgroundColor: '#fff',
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 48,
+    borderWidth: 1,
+    borderColor: '#d9cbb3',
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    paddingRight: 10,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 12,
+    fontSize: 15,
+    color: '#333',
+  },
+  eyeIcon: {
+    padding: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  eyeIconText: {
+    fontSize: 20,
   },
   button: {
     backgroundColor: '#8B6C42',

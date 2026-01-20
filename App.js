@@ -1,10 +1,14 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import { createDrawerNavigator } from '@react-navigation/drawer';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createStackNavigator } from '@react-navigation/stack'; // ✅ JavaScript-only (no drawer - drawer requires reanimated)
+import { Image } from 'react-native';
 import { CartProvider } from './src/contexts/CartContext';
 import { WishlistProvider } from './src/contexts/WishlistContext';
+import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import ErrorBoundary from './src/components/ErrorBoundary';
+
+// ✅ Logo for header
+const ThiaworldLogo = require('./src/assets/thiaworldlogo.png');
 import Home from './src/screens/HomeScreen';
 import ProductListings from './src/screens/ProductListing';
 import ProductDetails from './src/screens/ProductDetail';
@@ -35,307 +39,535 @@ import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
 import GoldSilverRatesScreen from './src/screens/GoldSilverRatesScreen';
 import AboutUsScreen from './src/screens/Aboutus';
 import TermsAndConditionsPage from './src/screens/TermsAndConditions';
+import ContactUsScreen from './src/screens/ContactUs';
 import ThiaSecurePlan from './src/screens/ThiaSecurePlan';
+import SearchScreen from './src/screens/SearchScreen';
+import GoldPlanScreen from './src/screens/GoldPlanScreen';
+import TryAtHomeScreen from './src/screens/TryAtHomeScreen';
 
 // Navigators
-const Stack = createNativeStackNavigator();
-const Drawer = createDrawerNavigator();
-
-/* ------------------ Drawer with Main App ------------------ */
-function MainDrawer() {
-  return (
-    <Drawer.Navigator
-      initialRouteName="Home"
-      screenOptions={{
-        headerShown: true,
-        drawerType: 'front',
-        headerStyle: { backgroundColor: 'black' },
-        headerTintColor: '#fff',
-        drawerStyle: {
-          backgroundColor: '#111',
-          width: 240,
-        },
-        drawerLabelStyle: { color: 'red', fontSize: 16 },
-      }}
-    >
-      <Drawer.Screen name="Home" component={Home}/>
-      <Drawer.Screen name="Products" component={ProductListings} />
-      <Drawer.Screen name="ProductDetails" component={ProductDetails} />
-      <Drawer.Screen name="Cart" component={CartPage} />
-      <Drawer.Screen name="Wishlist" component={JewelryWishlist} />
-      <Drawer.Screen name="Orders" component={OrderHistory} />
-      <Drawer.Screen name="MyWallet" component={MyWalletStyled} />
-      <Drawer.Screen name="Rewards" component={RewardsScreen} />
-      <Drawer.Screen name="Payments" component={SaveCardAndUPI} />
-      <Drawer.Screen name="StoreVisit" component={BookStoreVisit} />
-      <Drawer.Screen name="Exchange" component={GoldExchangeBuyback} />
-      <Drawer.Screen name="Rates" component={GoldSilverRatesScreen} />
-      <Drawer.Screen name="Account" component={UserAccount} />
-      <Drawer.Screen name="Profile" component={ProfileSettingsScreen} />
-      <Drawer.Screen name="Addresses" component={SavedAddressScreen} />
-      <Drawer.Screen name="Dashboard" component={DashboardScreen} />
-      <Drawer.Screen name="Franchise" component={FranchiseDashboard} />
-      <Drawer.Screen name="Territory" component={TerritoryDashboardScreen} />
-      <Drawer.Screen name="Agent" component={AgentScreen} />
-      <Drawer.Screen name="Vendor" component={VendorDashboard} />
-      <Drawer.Screen name="BecomeAVendor" component={BecomeVendorDashboard} />
-      <Drawer.Screen name="Notifications" component={Notifications} />
-      <Drawer.Screen name="AboutUs" component={AboutUsScreen} />
-      <Drawer.Screen name="Terms" component={TermsAndConditionsPage} />
-      <Drawer.Screen name="Checkout" component={CheckoutPage} />
-      <Drawer.Screen name="Success" component={SuccessPage} />
-    </Drawer.Navigator>
-  );
-}
+const Stack = createStackNavigator(); // ✅ JavaScript-only (safe, no drawer - drawer requires reanimated)
 
 /* ------------------ Auth Stack ------------------ */
 function AuthStack() {
+  const { colors, isDark } = useTheme();
   return (
-    <Stack.Navigator screenOptions={{ headerShown: true}}>
+    <Stack.Navigator 
+      screenOptions={{ 
+        headerShown: true,
+        headerStyle: { backgroundColor: colors.header },
+        headerTintColor: colors.text,
+        headerTitleStyle: { color: colors.text },
+      }}
+    >
       <Stack.Screen name="Intro" component={IntroScreen}  options={{ headerShown: false }} />
       <Stack.Screen name="SignIn" component={SignInScreen} options={{ headerShown: false }} />
       <Stack.Screen name="SignUp" component={Registration} options={{ headerShown: false }} />
-    <Stack.Screen
-    name="ForgotPassword"
-    component={ForgotPasswordScreen}
-    options={{
-    title: 'Forgot Password',
-    headerTitleAlign: 'center',   // center text
-  }}
-/>
-
+      <Stack.Screen
+        name="ForgotPassword"
+        component={ForgotPasswordScreen}
+        options={{
+          title: 'Forgot Password',
+          headerTitleAlign: 'center',
+          headerStyle: { backgroundColor: colors.header },
+          headerTintColor: colors.text,
+          headerTitleStyle: { color: colors.text },
+        }}
+      />
     </Stack.Navigator>
   );
 }
+
+/* ------------------ Main App Navigator (with Theme) ------------------ */
+function AppNavigator() {
+  const { colors, isDark } = useTheme();
+  
+  return (
+    <NavigationContainer
+      theme={{
+        dark: isDark,
+        colors: {
+          primary: colors.primary,
+          background: colors.background,
+          card: colors.card,
+          text: colors.text,
+          border: colors.border,
+          notification: colors.primary,
+        },
+        fonts: {
+          regular: {
+            fontFamily: 'System',
+            fontWeight: '400',
+          },
+          medium: {
+            fontFamily: 'System',
+            fontWeight: '500',
+          },
+          bold: {
+            fontFamily: 'System',
+            fontWeight: '700',
+          },
+          heavy: {
+            fontFamily: 'System',
+            fontWeight: '800',
+          },
+        },
+      }}
+    >
+      <Stack.Navigator 
+        initialRouteName="Welcome" // ✅ Set initial route
+        screenOptions={{ 
+          headerShown: true,
+          headerStyle: { backgroundColor: colors.header },
+          headerTintColor: colors.text,
+          headerTitleStyle: { 
+            color: colors.text,
+            fontWeight: '600', // ✅ Add fontWeight to prevent font access errors
+          },
+          cardStyle: { backgroundColor: colors.background },
+        }}
+      >
+              
+              {/* Auth Flow */}
+              <Stack.Screen 
+                name="Welcome" 
+                component={AuthStack}  
+                options={{ headerShown: false }}
+              />
+
+              {/* Main App Screens */}
+              <Stack.Screen
+                name="Intro"
+                component={IntroScreen}
+                options={{
+                  title: '',
+                  headerTitleAlign: 'center',
+                  headerTitleStyle: {
+                    fontWeight: 'bold',
+                    fontSize: 20,
+                    color: colors.text,
+                  },
+                  headerStyle: {
+                    backgroundColor: colors.header,
+                  },
+                }}
+              />
+
+              <Stack.Screen
+                name="SignUp"
+                component={Registration}
+                options={{
+                  title: 'Sign Up',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="ThiaSecurePlan"
+                component={ThiaSecurePlan}
+                options={{
+                  title: 'Thia Secure Plan',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="SignIn"
+                component={SignInScreen}
+                options={{
+                  title: 'Sign In',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+               
+              <Stack.Screen
+                name="ForgotPassword"
+                component={ForgotPasswordScreen}
+                options={{
+                  title: 'Forgot Password',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="Home"
+                component={Home}
+                options={{
+                  headerTitle: () => (
+                    <Image
+                      source={ThiaworldLogo}
+                      style={{
+                        width: 360,
+                        height: 140,
+                        resizeMode: 'contain',
+                      }}
+                    />
+                  ),
+                  headerTitleAlign: 'center',
+                  headerStyle: {
+                    backgroundColor: colors.header,
+                    height: 80,
+                    elevation: 0,
+                    shadowOpacity: 0,
+                  },
+                  headerTitleContainerStyle: {
+                    left: 0,
+                    right: 0,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  },
+                }}
+              />
+
+              <Stack.Screen
+                name="Search"
+                component={SearchScreen}
+                options={{ headerShown: false }}
+              />
+
+              <Stack.Screen
+                name="Products"
+                component={ProductListings}
+                options={{
+                  title: 'Product Listings',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="ProductDetails"
+                component={ProductDetails}
+                options={{
+                  title: 'Product Details',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="Cart"
+                component={CartPage}
+                options={{
+                  title: 'My Cart',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="Notifications"
+                component={Notifications}
+                options={{
+                  title: 'Notifications',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="Account"
+                component={UserAccount}
+                options={{
+                  title: 'Account',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name='MyWallet'
+                component={MyWalletStyled}
+                options={{
+                  title: 'My Wallet',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="Profile"
+                component={ProfileSettingsScreen}
+                options={{
+                  title: 'Profile',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="Orders"
+                component={OrderHistory}
+                options={{
+                  title: 'Order History',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="Wishlist"
+                component={JewelryWishlist}
+                options={{
+                  title: 'My Wishlist',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="Exchange"
+                component={GoldExchangeBuyback}
+                options={{
+                  title: 'Gold Exchange Buy ',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="Payments"
+                component={SaveCardAndUPI}
+                options={{
+                  title: 'My Bank Account ',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="StoreVisit"
+                component={BookStoreVisit}
+                options={{
+                  title: 'Book Store Visit ',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="Rewards"
+                component={RewardsScreen}
+                options={{
+                  title: 'Exclusive Offers',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="GoldPlan"
+                component={GoldPlanScreen}
+                options={{
+                  title: 'Gold Plan',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="TryAtHome"
+                component={TryAtHomeScreen}
+                options={{
+                  title: 'Try@Home',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="ProfileSettings"
+                component={ProfileSettingsScreen}
+                options={{
+                  title: 'Profile Settings',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="Addresses"
+                component={SavedAddressScreen}
+                options={{
+                  title: 'My Address',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+              
+              <Stack.Screen
+                name="Ratings"
+                component={GoldSilverRatesScreen}
+                options={{
+                  title: 'Gold & Silver Ranges',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="Dashboard"
+                component={DashboardScreen}
+                options={{
+                  title: 'Dashboard',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="Franchise"
+                component={FranchiseDashboard}
+                options={{
+                  title: 'Franchise Dashboard',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="Territory"
+                component={TerritoryDashboardScreen}
+                options={{
+                  title: 'Territory Dashboard',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="Agent"
+                component={AgentScreen}
+                options={{
+                  title: 'Agent Dashboard',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="Vendor"
+                component={VendorDashboard}
+                options={{
+                  title: 'Vendor Dashboard',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="BecomeAVendor"
+                component={BecomeVendorDashboard}
+                options={{
+                  title: 'Become A Vendor Dashboard',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="Checkout"
+                component={CheckoutPage}
+                options={{
+                  title: 'Checkout',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+              
+              <Stack.Screen
+                name="AboutUs"
+                component={AboutUsScreen}
+                options={{
+                  title: 'About Us',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="TermsAndConditions"
+                component={TermsAndConditionsPage}
+                options={{
+                  title: 'Terms And Conditions',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="ContactUs"
+                component={ContactUsScreen}
+                options={{
+                  title: 'Contact Us',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="Success"
+                component={SuccessPage}
+                options={{
+                  title: 'Successfully',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+            </Stack.Navigator>
+          </NavigationContainer>
+        );
+      }
+
 export default function App() {
   console.log('📱 App component rendering...');
   
   return (
     <ErrorBoundary>
-      <WishlistProvider>
-        <CartProvider>
-          <NavigationContainer>
-         <Stack.Navigator screenOptions={{ headerShown: true }}>
-           
-           {/* Auth Flow */}
-          <Stack.Screen name="Welcome" component={AuthStack}  
-          options={{ headerShown: false }}/>
-
-          {/* Drawer Main App */}
-          <Stack.Screen name="Main" component={MainDrawer}   />
-
-          
-          <Stack.Screen
-            name="Intro"
-            component={IntroScreen}
-             options={{
-              title: '',
-              headerTitleAlign: 'center',
-              headerTitleStyle: {
-                fontWeight: 'bold',
-                fontSize: 20,
-                color: 'white',
-              },
-              headerStyle: {
-                backgroundColor: 'black',
-              },
-            }}
-          />
-
-          <Stack.Screen
-            name="SignUp"
-            component={Registration}
-            options={{ title: 'Sign Up' }}
-          />
-
-            <Stack.Screen
-            name="ThiaSecurePlan"
-            component={ThiaSecurePlan}
-            options={{ title: 'Thia Secure Plan' }}
-          />
-
-          <Stack.Screen
-            name="SignIn"
-            component={SignInScreen}
-            options={{ title: 'Sign In' }}
-          />
-           
-          <Stack.Screen
-            name="ForgotPassword"
-            component={ForgotPasswordScreen}
-            options={{ title: 'Forgot Password' }}
-          />
-          <Stack.Screen
-            name="Home"
-            component={Home}
-            options={{
-              title: 'Thiaworld Jewellery',
-              headerTitleAlign: 'center',
-              headerTitleStyle: {
-                fontWeight: 'bold',
-                fontSize: 20,
-                color: 'black',
-              },
-              headerStyle: {
-                backgroundColor: 'white',
-              },
-            }}
-          />
-
-          <Stack.Screen
-            name="Products"
-            component={ProductListings}
-            options={{ title: 'Product Listings' }}
-          />
-
-          <Stack.Screen
-            name="ProductDetails"
-            component={ProductDetails}
-            options={{ title: 'Product Details' }}
-          />
-
-          <Stack.Screen
-            name="Cart"
-            component={CartPage}
-            options={{ title: 'My Cart' }}
-          />
-
-          <Stack.Screen
-            name="Notifications"
-            component={Notifications}
-            options={{ title: 'Notifications' }}
-          />
-
-          <Stack.Screen
-            name="Account"
-            component={UserAccount}
-            options={{ title: 'Account' }}
-          />
-
-          <Stack.Screen
-            name='MyWallet'
-            component={MyWalletStyled}
-            options={{ title: 'My Wallet' }}
-          />
-          <Stack.Screen
-            name="Profile"
-            component={ProfileSettingsScreen}
-            options={{ title: 'Profile' }}
-          />
-          <Stack.Screen
-            name="Orders"
-            component={OrderHistory}
-            options={{ title: 'Order History' }}
-          />
-
-          <Stack.Screen
-            name="Wishlist"
-            component={JewelryWishlist}
-            options={{ title: 'My Wishlist' }}
-          />
-
-          <Stack.Screen
-            name="Exchange"
-            component={GoldExchangeBuyback}
-            options={{ title: 'Gold Exchange Buy ' }}
-          />
-
-          <Stack.Screen
-            name="Payments"
-            component={SaveCardAndUPI}
-            options={{ title: 'My Bank Account ' }}
-          />
-
-          <Stack.Screen
-            name="StoreVisit"
-            component={BookStoreVisit}
-            options={{ title: 'Book Store Visit ' }}
-          />
-
-          <Stack.Screen
-            name="Rewards"
-            component={RewardsScreen}
-            options={{ title: 'Exclusive Offers' }}
-          />
-          <Stack.Screen
-            name="ProfileSettings"
-            component={ProfileSettingsScreen}
-            options={{ title: 'Profile Settings' }}
-          />
-
-          <Stack.Screen
-            name="Addresses"
-            component={SavedAddressScreen}
-            options={{ title: 'My Address' }}
-          />
-          
-           <Stack.Screen
-            name="Ratings"
-            component={GoldSilverRatesScreen}
-            options={{ title: 'Gold & Silver Ranges' }}
-          />
-          <Stack.Screen
-            name="Dashboard"
-            component={DashboardScreen}
-            options={{ title: 'Dashboard' }}
-          />
-          <Stack.Screen
-            name="Franchise"
-            component={FranchiseDashboard}
-            options={{ title: 'Franchise Dashboard' }}
-          />
-
-          <Stack.Screen
-            name="Territory"
-            component={TerritoryDashboardScreen}
-            options={{ title: 'Territory Dashboard' }}
-          />
-
-          <Stack.Screen
-            name="Agent"
-            component={AgentScreen}
-            options={{ title: 'Agent Dashboard' }}
-          />
-
-          <Stack.Screen
-            name="Vendor"
-            component={VendorDashboard}
-            options={{ title: 'Vendor Dashboard' }}
-          />
-
-          <Stack.Screen
-            name="BecomeAVendor"
-            component={BecomeVendorDashboard}
-            options={{ title: 'Become A Vendor Dashboard' }}
-          />
-
-          <Stack.Screen
-            name="Checkout"
-            component={CheckoutPage}
-            options={{ title: 'Checkout' }}
-          />
-          
-              <Stack.Screen
-            name="AboutUs"
-            component={AboutUsScreen}
-            options={{ title: 'About Us' }}
-          />
-
-            <Stack.Screen
-            name="TermsAndConditions"
-            component={TermsAndConditionsPage}
-            options={{ title: 'Terms And Conditions' }}
-          />
-
-          <Stack.Screen
-            name="Success"
-            component={SuccessPage}
-            options={{ title: 'Successfully' }}
-          />
-        </Stack.Navigator>
-      </NavigationContainer>
-        </CartProvider>
-      </WishlistProvider>
+      <ThemeProvider>
+        <WishlistProvider>
+          <CartProvider>
+            <AppNavigator />
+          </CartProvider>
+        </WishlistProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }

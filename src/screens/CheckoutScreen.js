@@ -9,14 +9,19 @@ import {
   ScrollView,
   Alert,
 } from "react-native";
+import { useNavigation } from '@react-navigation/native';
 import axios from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCart } from "../contexts/CartContext";
 import RazorpayCheckout from "react-native-razorpay";
 
 const API_BASE = "https://thiaworld.bbscart.com";
 const RAZORPAY_KEY = "rzp_test_5kdXsZAny3KeQZ";
 
-export default function CheckoutPage({ navigation, route }) {
+export default function CheckoutPage({ navigation: propNavigation, route }) {
+  const hookNavigation = useNavigation();
+  const navigation = propNavigation || hookNavigation; // ✅ Fallback to hook navigation
+  
   const cart = useCart();
   const buyNowItem = route?.params?.buyNowItem;
   const goldCart = Array.isArray(cart.goldCart) ? cart.goldCart : [];
@@ -91,70 +96,204 @@ export default function CheckoutPage({ navigation, route }) {
     try {
       setPlacing(true);
 
-      const res = await axios.post(
-        `${API_BASE}/api/payment/razorpay/create-order`,
-        {
-          amount: Math.round(Number(totalAmount) * 100),
-          currency: "INR",
+      // ✅ Get authentication token
+      let token = await AsyncStorage.getItem("THIAWORLD_TOKEN");
+      if (!token) {
+        const raw = await AsyncStorage.getItem("bbsUser");
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            token = parsed?.token;
+          } catch (e) {
+            console.log('Error parsing bbsUser:', e);
+          }
         }
-      );
-      console.log("CREATE ORDER RAW RESPONSE", res.data);
+      }
 
-      const orderData = res.data.order ? res.data.order : res.data;
+      // ✅ Calculate amount - web version sends in rupees, backend converts to paise
+      const amountInRupees = Number(totalAmount);
+      const amountInPaise = Math.round(amountInRupees * 100);
+      
+      console.log("💰 Creating Razorpay order for amount:", amountInRupees, "INR (", amountInPaise, "paise)");
 
-      const orderId = orderData.id;
-      const amount = Number(orderData.amount);
-      const currency = orderData.currency || "INR";
+      // ✅ Try multiple API endpoints (matching web version)
+      let res;
+      const endpoints = [
+        `${API_BASE}/razorpay/create-order`, // ✅ Web version uses this
+        `${API_BASE}/api/razorpay/create-order`,
+        `${API_BASE}/api/payment/razorpay/create-order`,
+      ];
 
-      console.log("RAZORPAY OPEN DATA", {
-        orderId,
-        amount,
-        currency,
-        key: RAZORPAY_KEY,
-      });
+      let orderData = null;
+      let lastError = null;
+      
+      for (const endpoint of endpoints) {
+        try {
+          // ✅ Prepare request config with auth headers if token exists
+          const config = {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          };
+          
+          if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+          }
 
-      if (!orderId || !amount || !RAZORPAY_KEY) {
-        Alert.alert("Payment Error", "Invalid payment data");
+          // ✅ Web version sends amount in rupees, not paise
+          res = await axios.post(
+            endpoint,
+            {
+              amount: amountInRupees, // ✅ Send in rupees like web version
+            },
+            config
+          );
+          
+          console.log("✅ Order created from endpoint:", endpoint);
+          console.log("📦 Response data:", JSON.stringify(res.data, null, 2));
+          
+          // ✅ Handle different response structures
+          orderData = res.data?.order || res.data?.data || res.data;
+          if (orderData?.id) {
+            console.log("✅ Order ID found:", orderData.id);
+            break;
+          }
+        } catch (endpointError) {
+          const errorDetails = {
+            message: endpointError.message,
+            response: endpointError.response?.data,
+            status: endpointError.response?.status,
+          };
+          console.error("❌ Endpoint failed:", endpoint, JSON.stringify(errorDetails, null, 2));
+          lastError = endpointError;
+          continue;
+        }
+      }
+
+      if (!orderData || !orderData.id) {
+        const errorMsg = lastError?.response?.data?.message || 
+                        lastError?.message || 
+                        "Unable to create payment order";
+        console.error("❌ Failed to create order from all endpoints. Last error:", lastError);
+        Alert.alert(
+          "Payment Error", 
+          `${errorMsg}. Please check your internet connection and try again.`
+        );
+        setPlacing(false);
         return;
       }
 
-      RazorpayCheckout.open({
-        key: RAZORPAY_KEY,
+      const orderId = orderData.id;
+      const amount = Number(orderData.amount) || amountInPaise;
+      const currency = orderData.currency || "INR";
+
+      console.log("🔐 Opening Razorpay with:", {
+        orderId,
         amount,
         currency,
+        key: RAZORPAY_KEY ? "Present" : "Missing",
+      });
+
+      if (!orderId || !amount || !RAZORPAY_KEY) {
+        Alert.alert("Payment Error", `Invalid payment data: ${!orderId ? 'Missing orderId' : !amount ? 'Missing amount' : 'Missing Razorpay key'}`);
+        setPlacing(false);
+        return;
+      }
+
+      // ✅ Verify RazorpayCheckout is available
+      if (!RazorpayCheckout || typeof RazorpayCheckout.open !== 'function') {
+        console.error("❌ RazorpayCheckout is not available");
+        Alert.alert("Payment Error", "Payment gateway is not available. Please reinstall the app.");
+        setPlacing(false);
+        return;
+      }
+
+      // ✅ Open Razorpay checkout - amount must be string for react-native-razorpay
+      console.log("🚀 Calling RazorpayCheckout.open()...");
+      
+      RazorpayCheckout.open({
+        description: "Thiaworld Jewellery Order Payment",
+        image: "https://thiaworld.bbscart.com/uploads/thiaworldlogo.png",
+        currency: currency,
+        key: RAZORPAY_KEY,
+        amount: amount.toString(), // ✅ Ensure amount is string
         name: "Thiaworld Jewellery",
-        description: "Order Payment",
-        order_id: orderId,
+        order_id: orderId, // ✅ Use order_id (required parameter)
         prefill: {
-          name: "",
           email: "",
           contact: "",
+          name: "",
         },
-        theme: { color: "#F37254" },
+        theme: { color: "#B8860B" }, // ✅ Use app theme color
+        notes: {
+          order_id: orderId,
+        },
       })
         .then(async (response) => {
-          await axios.post(`${API_BASE}/checkout/update-payment-status`, {
-            razorpay_order_id: orderId,
-            razorpay_payment_id: response.razorpay_payment_id,
-            status: "paid",
-          });
+          console.log("✅ Payment successful:", response);
+          
+          try {
+            // ✅ Update payment status
+            await axios.post(`${API_BASE}/api/checkout/update-payment-status`, {
+              razorpay_order_id: orderId,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              status: "paid",
+            });
 
-          clearCart("gold");
-          clearCart("silver");
-          clearCart("diamond");
-          clearCart("platinum");
+            // ✅ Clear all carts
+            clearCart("gold");
+            clearCart("silver");
+            clearCart("diamond");
+            clearCart("platinum");
 
-          navigation.replace("Success");
+            // ✅ Navigate to success page
+            if (navigation && navigation.replace) {
+              navigation.replace("Success");
+            } else {
+              Alert.alert("Success", "Payment successful! Order placed.");
+            }
+          } catch (updateError) {
+            console.error("❌ Error updating payment status:", updateError);
+            Alert.alert("Payment Successful", "Your payment was successful, but there was an error updating the order. Please contact support.");
+          }
         })
-        .catch(() => {
-          Alert.alert("Payment cancelled");
+        .catch((error) => {
+          console.error("❌ Razorpay error details:", JSON.stringify(error, null, 2));
+          
+          // ✅ Better error handling with detailed logging
+          if (error?.error) {
+            const errorCode = error.error.code;
+            const errorDescription = error.error.description || error.error.reason || error.error.message || "Unknown error";
+            
+            console.error("❌ Razorpay error code:", errorCode, "Description:", errorDescription);
+            
+            if (errorCode === "BAD_REQUEST_ERROR") {
+              Alert.alert("Payment Error", `Invalid payment request: ${errorDescription}`);
+            } else if (errorCode === "GATEWAY_ERROR") {
+              Alert.alert("Payment Error", "Payment gateway error. Please try again.");
+            } else if (errorCode === "NETWORK_ERROR") {
+              Alert.alert("Network Error", "Please check your internet connection and try again.");
+            } else if (errorCode === "INVALID_ORDER_ID") {
+              Alert.alert("Payment Error", "Invalid order ID. Please try again.");
+            } else {
+              Alert.alert("Payment Error", errorDescription || "Payment was cancelled or failed.");
+            }
+          } else if (error?.code) {
+            // ✅ Handle direct error codes
+            console.error("❌ Razorpay error code:", error.code);
+            Alert.alert("Payment Error", error.description || error.message || "Payment failed. Please try again.");
+          } else {
+            // ✅ Generic error - log full error for debugging
+            console.error("❌ Unknown Razorpay error:", error);
+            Alert.alert("Payment Error", error?.message || "Payment gateway failed to open. Please try again.");
+          }
         });
 
     } catch (err) {
-      console.log("PAYMENT INIT ERROR", err?.response?.data || err.message || err);
-      Alert.alert("Error", "Unable to initiate payment");
-    }
- finally {
+      console.error("❌ PAYMENT INIT ERROR:", err?.response?.data || err.message || err);
+      Alert.alert("Error", `Unable to initiate payment: ${err.message || "Please try again"}`);
+    } finally {
       setPlacing(false);
     }
   };

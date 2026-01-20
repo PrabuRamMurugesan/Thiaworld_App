@@ -23,10 +23,34 @@ const API_PRODUCT_BY_ID = 'https://thiaworld.bbscart.com/api/products/';
 const API_BASE = 'https://thiaworld.bbscart.com';
 
 const buildImageUrl = (img) => {
-  if (!img) return null;
-  if (img.startsWith('http')) return img;
-  if (img.startsWith('/uploads')) return `${API_BASE}${img}`;
-  return `${API_BASE}/uploads/${img}`;
+  // ✅ Safety check: handle undefined/null/empty
+  if (!img || typeof img !== 'string' || img.trim() === '') {
+    return null;
+  }
+  
+  // ✅ Clean up the image source (remove any pipe-separated values)
+  let imageSource = img;
+  if (imageSource.includes('|')) {
+    imageSource = imageSource.split('|')[0];
+  }
+  
+  // ✅ If already a full URL, return as-is
+  if (imageSource.startsWith('http://') || imageSource.startsWith('https://')) {
+    return imageSource;
+  }
+  
+  // ✅ Handle paths that already start with uploads/
+  if (imageSource.startsWith('uploads/')) {
+    return `${API_BASE}/${imageSource}`;
+  }
+  
+  // ✅ Handle paths that start with /uploads/
+  if (imageSource.startsWith('/uploads/')) {
+    return `${API_BASE}${imageSource}`;
+  }
+  
+  // ✅ Default: prepend uploads path
+  return `${API_BASE}/uploads/${imageSource}`;
 };
 
 // ==============================
@@ -181,7 +205,17 @@ const normalizeImages = (p) => {
       return;
     }
     if (typeof x === 'string') {
-      arr.push(x);
+      // ✅ Handle pipe-separated image strings (e.g., "image.jpg|thumb.jpg")
+      const images = x.split('|').map(img => img.trim()).filter(Boolean);
+      images.forEach(img => arr.push(img));
+      return;
+    }
+    // ✅ Handle object with url/src property
+    if (typeof x === 'object' && x !== null) {
+      const url = x.url || x.src || x.image || x.uri;
+      if (url && typeof url === 'string') {
+        arr.push(url);
+      }
       return;
     }
   };
@@ -199,7 +233,7 @@ const normalizeImages = (p) => {
   push(p.product_image);
   push(p.mainImage);
 
-  // dedupe
+  // ✅ dedupe and build URLs
   const out = [];
   const seen = new Set();
   for (const u of arr) {
@@ -207,12 +241,15 @@ const normalizeImages = (p) => {
     if (!key) continue;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push(key);
+    
+    // ✅ Build URL and only add if valid
+    const builtUrl = buildImageUrl(key);
+    if (builtUrl) {
+      out.push(builtUrl);
+    }
   }
-  return out
-    .map(buildImageUrl)
-    .filter(Boolean);
-
+  
+  return out;
 };
 
 const normalizeProduct = (raw) => {
@@ -343,7 +380,27 @@ const ProductDetails = ({ route }) => {
 
         // backend may return { product } or direct object
         const raw = data?.product || data?.data || data || {};
+        
+        // ✅ Debug: Log raw API response for troubleshooting
+        console.log('📦 API Product Response:', {
+          hasProduct: !!raw,
+          hasImages: !!raw.images,
+          imagesType: Array.isArray(raw.images) ? 'array' : typeof raw.images,
+          imagesValue: raw.images,
+          hasImage: !!raw.image,
+          imageValue: raw.image,
+        });
+        
         const normalized = normalizeProduct(raw);
+        
+        // ✅ Debug: Log normalized product
+        console.log('✅ Normalized Product:', {
+          id: normalized.id,
+          name: normalized.name,
+          imagesCount: normalized.images?.length,
+          images: normalized.images,
+          image: normalized.image,
+        });
 
         setApiProduct(normalized);
 
@@ -453,6 +510,26 @@ const ProductDetails = ({ route }) => {
     </TouchableOpacity>
   );
 
+  // ✅ Debug: Log product images for troubleshooting
+  useEffect(() => {
+    if (product && !loading) {
+      console.log('📸 Product images:', {
+        images: product.images,
+        image: product.image,
+        imagesLength: product.images?.length,
+        hasImage: !!product.image,
+      });
+    }
+  }, [product, loading]);
+
+  // ✅ Prepare display images array
+  const displayImages = (product.images?.length ? product.images : [product.image]).filter(Boolean);
+  
+  // ✅ Show placeholder if no images available
+  if (displayImages.length === 0) {
+    console.log('⚠️ No images available for product:', product.id, product.name);
+  }
+
   // IMPORTANT: keep UI identical — only show a loading text (same behavior as before)
   if (loading) {
     return (
@@ -478,25 +555,48 @@ const ProductDetails = ({ route }) => {
             }}
             scrollEventThrottle={16}
           >
-            {(product.images?.length ? product.images : [product.image]).map((img, i) => (
-              <Image key={i} source={{ uri: img }} style={styles.productImage} />
-            ))}
+            {displayImages.length > 0 ? (
+              displayImages.map((img, i) => (
+                <Image 
+                  key={i} 
+                  source={{ uri: img }} 
+                  style={styles.productImage}
+                  resizeMode="contain"
+                  onError={(error) => {
+                    console.log('❌ Product image load error:', img, error.nativeEvent.error);
+                  }}
+                />
+              ))
+            ) : (
+              <View style={[styles.productImage, { justifyContent: 'center', alignItems: 'center' }]}>
+                <Text style={{ color: '#999', fontSize: 16 }}>No image available</Text>
+              </View>
+            )}
           </ScrollView>
 
           {/* Thumbnails */}
           <View style={styles.thumbRow}>
-            {(product.images?.length ? product.images : [product.image]).map((img, i) => (
-              <TouchableOpacity
-                key={i}
-                onPress={() => onPressThumb(i)}
-                style={[
-                  styles.thumbnailWrap,
-                  activeIndex === i && styles.thumbnailActive,
-                ]}
-              >
-                <Image source={{ uri: img }} style={styles.thumbnail} />
-              </TouchableOpacity>
-            ))}
+            {displayImages.length > 0 ? (
+              displayImages.map((img, i) => (
+                <TouchableOpacity
+                  key={i}
+                  onPress={() => onPressThumb(i)}
+                  style={[
+                    styles.thumbnailWrap,
+                    activeIndex === i && styles.thumbnailActive,
+                  ]}
+                >
+                  <Image 
+                    source={{ uri: img }} 
+                    style={styles.thumbnail}
+                    resizeMode="cover"
+                    onError={(error) => {
+                      console.log('❌ Thumbnail image load error:', img, error.nativeEvent.error);
+                    }}
+                  />
+                </TouchableOpacity>
+              ))
+            ) : null}
           </View>
         </View>
 
@@ -693,7 +793,8 @@ const styles = StyleSheet.create({
     width,
     height: height * 0.45,
     resizeMode: 'contain',
-    backgroundColor: '#fff',
+    backgroundColor: '#f5f5f5',
+    minHeight: 300,
   },
   thumbRow: {
     flexDirection: 'row',

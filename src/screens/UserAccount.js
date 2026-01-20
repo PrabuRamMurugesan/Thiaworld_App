@@ -103,8 +103,8 @@ const UserAccount = ({ navigation }) => {
         />
         <MenuItem
           emoji="🛒"
-          text="Custom Jewellery Orders"
-          onPress={() => handleNavigation("CustomOrders")}
+          text="Cart"
+          onPress={() => handleNavigation("Cart")}
         />
         <MenuItem
           emoji="❤️"
@@ -173,8 +173,8 @@ const UserAccount = ({ navigation }) => {
         <Text style={styles.sectionTitle}>Support</Text>
         <MenuItem
           emoji="❓"
-          text="Help Center"
-          onPress={() => handleNavigation("Help")}
+          text="Contact Us"
+          onPress={() => handleNavigation("ContactUs")}
         />
         <MenuItem
           emoji="📜"

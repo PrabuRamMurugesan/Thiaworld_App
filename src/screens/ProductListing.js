@@ -7,26 +7,45 @@ import {
 import { Picker } from '@react-native-picker/picker';
 import { useNavigation } from '@react-navigation/native';
 import { useCart } from '../contexts/CartContext';
+import { useWishlist } from '../contexts/WishlistContext';
+import Icon from 'react-native-vector-icons/Ionicons';
+import { Alert } from 'react-native';
 
 const { width } = Dimensions.get('window');
 const ITEM_HEIGHT = 200;
 
 const GOLD_PRODUCTS_API = 'https://thiaworld.bbscart.com/api/products/gold';
 
-// ✅ IMAGE URL FIX (VERY IMPORTANT)
+// ✅ IMAGE URL FIX (VERY IMPORTANT) - Enhanced version
 const buildImageUrl = (img) => {
-    if (!img) return '';
-
-    // already absolute
-    if (img.startsWith('http')) return img;
-
-    // if already contains uploads
-    if (img.startsWith('uploads/')) {
-        return `https://thiaworld.bbscart.com/${img}`;
+    // ✅ Safety check: handle undefined/null/empty
+    if (!img || typeof img !== 'string' || img.trim() === '') {
+        return 'https://via.placeholder.com/150'; // Return placeholder instead of empty string
     }
 
-    // fallback
-    return `https://thiaworld.bbscart.com/uploads/${img}`;
+    // ✅ Clean up the image source (remove any pipe-separated values)
+    let imageSource = img;
+    if (imageSource.includes('|')) {
+        imageSource = imageSource.split('|')[0].trim();
+    }
+
+    // ✅ If already a full URL, return as-is
+    if (imageSource.startsWith('http://') || imageSource.startsWith('https://')) {
+        return imageSource;
+    }
+
+    // ✅ Handle paths that already start with uploads/
+    if (imageSource.startsWith('uploads/')) {
+        return `https://thiaworld.bbscart.com/${imageSource}`;
+    }
+
+    // ✅ Handle paths that start with /uploads/
+    if (imageSource.startsWith('/uploads/')) {
+        return `https://thiaworld.bbscart.com${imageSource}`;
+    }
+
+    // ✅ Default: prepend uploads path
+    return `https://thiaworld.bbscart.com/uploads/${imageSource}`;
 };
 
 // ---------------- Hero Banner (UNCHANGED) ----------------
@@ -38,10 +57,10 @@ const heroBannerImages = [
 
 const ProductListings = () => {
     const { addToCart } = useCart();
+    const { isWishlisted, toggleWishlist } = useWishlist(); // ✅ Use WishlistContext
 
     const [selectedQuantity, setSelectedQuantity] = useState({});
     const [productQuantities, setProductQuantities] = useState({});
-    const [wishlist, setWishlist] = useState({});
     const [searchQuery, setSearchQuery] = useState('');
     const [sortOption, setSortOption] = useState('default');
 
@@ -91,23 +110,61 @@ const ProductListings = () => {
 
             const rawProducts = Array.isArray(result)
                 ? result
-                : result.items || [];
+                : result.items || result.data || [];
+            
+            // ✅ Debug: Log first product to see image structure
+            if (rawProducts.length > 0) {
+                console.log('📦 Sample product from API:', {
+                    id: rawProducts[0]._id,
+                    name: rawProducts[0].name,
+                    hasImages: !!rawProducts[0].images,
+                    imagesType: Array.isArray(rawProducts[0].images) ? 'array' : typeof rawProducts[0].images,
+                    imagesValue: rawProducts[0].images,
+                    hasImage: !!rawProducts[0].image,
+                    imageValue: rawProducts[0].image,
+                });
+            }
 
-            let mappedProducts = rawProducts.map((p) => ({
-                id: p._id,
-                name: p.name,
-                category: 'Gold',
-                image:
-                    p.images && p.images.length > 0
-                        ? buildImageUrl(p.images[0])
-                        : '',
-                priceOptions: [
-                    {
-                        weight: `${p.netWeight || 0}g`,
-                        price: p.finalPrice || p.price || 0,
-                    },
-                ],
-            }));
+            let mappedProducts = rawProducts.map((p) => {
+                // ✅ Extract image from multiple possible sources
+                let imageSource = null;
+                
+                // Try images array first
+                if (p.images && Array.isArray(p.images) && p.images.length > 0) {
+                    const firstImage = p.images[0];
+                    // Handle string or object format
+                    if (typeof firstImage === 'string') {
+                        imageSource = firstImage;
+                    } else if (typeof firstImage === 'object' && firstImage !== null) {
+                        imageSource = firstImage.url || firstImage.src || firstImage.image || firstImage.uri;
+                    }
+                }
+                
+                // Fallback to single image field
+                if (!imageSource) {
+                    imageSource = p.image || p.product_img || p.productImg || p.product_image || p.mainImage;
+                }
+                
+                // Build final image URL
+                const finalImage = imageSource ? buildImageUrl(imageSource) : 'https://via.placeholder.com/150';
+                
+                return {
+                    id: p._id,
+                    _id: p._id, // Keep _id for navigation
+                    name: p.name,
+                    category: (p.category || 'gold').toLowerCase(), // Ensure lowercase
+                    image: finalImage,
+                    images: p.images || [], // Keep images array for product details
+                    price: p.finalPrice || p.price || 0, // Add direct price field
+                    mrp: p.mrp || p.strikePrice || p.finalPrice || p.price || 0, // Add MRP field
+                    priceOptions: [
+                        {
+                            weight: `${p.netWeight || 0}g`,
+                            price: p.finalPrice || p.price || 0,
+                        },
+                    ],
+                };
+            });
 
             // Search
             if (searchQuery) {
@@ -140,11 +197,41 @@ const ProductListings = () => {
     };
 
     const handleAddToCart = (product) => {
-        addToCart(product);
+        try {
+            // ✅ Prepare product object with all required fields for CartContext
+            const cartProduct = {
+                id: product.id || product._id,
+                name: product.name,
+                category: (product.category || 'gold').toLowerCase(), // Ensure lowercase
+                price: product.priceOptions?.[0]?.price || product.price || 0,
+                image: product.image,
+                images: product.images || [],
+                quantity: productQuantities[product.id] || 1,
+                // Include other useful fields
+                mrp: product.mrp || product.priceOptions?.[0]?.price || 0,
+            };
+
+            addToCart(cartProduct);
+            
+            // ✅ Show success feedback
+            Alert.alert(
+                'Added to Cart',
+                `${product.name} has been added to your cart.`,
+                [{ text: 'OK' }]
+            );
+        } catch (error) {
+            console.error('Error adding to cart:', error);
+            Alert.alert('Error', 'Failed to add item to cart. Please try again.');
+        }
     };
 
-    const toggleWishlist = (productId) => {
-        setWishlist((prev) => ({ ...prev, [productId]: !prev[productId] }));
+    const handleToggleWishlist = async (productId) => {
+        try {
+            await toggleWishlist(productId);
+        } catch (error) {
+            console.log('Wishlist toggle error:', error);
+            // Error handling is done in WishlistContext
+        }
     };
 
     const handleViewProduct = (product) => {
@@ -170,13 +257,17 @@ const ProductListings = () => {
     const renderProduct = ({ item }) => {
         const currentPriceOption = selectedQuantity[item.id] || item.priceOptions[0];
         const productQuantity = productQuantities[item.id] || 1;
-        const isWishlisted = wishlist[item.id] || false;
+        const itemIsWishlisted = isWishlisted(item.id); // ✅ Use WishlistContext
 
         return (
             <View style={styles.productContainer}>
                 <Image
-                    source={{ uri: item.image }}
+                    source={{ uri: item.image || 'https://via.placeholder.com/150' }}
                     style={styles.productImage}
+                    resizeMode="cover"
+                    onError={(error) => {
+                        console.log('❌ Product image load error:', item.id, item.name, 'URL:', item.image);
+                    }}
                 />
 
                 <View style={styles.productDetails}>
@@ -197,19 +288,30 @@ const ProductListings = () => {
                     </View>
 
                     <View style={styles.actionIcons}>
-                        <TouchableOpacity onPress={() => toggleWishlist(item.id)}>
-                            <Text>{isWishlisted ? '💛' : '🤍'}</Text>
+                        <TouchableOpacity 
+                            onPress={() => handleToggleWishlist(item.id)}
+                            style={styles.wishlistButton}
+                        >
+                            <Icon
+                                name={itemIsWishlisted ? 'heart' : 'heart-outline'}
+                                size={24}
+                                color={itemIsWishlisted ? 'red' : '#666'}
+                            />
                         </TouchableOpacity>
 
                         <TouchableOpacity
                             style={styles.addToCartButton}
                             onPress={() => handleAddToCart(item)}
                         >
-                            <Text style={styles.addToCartText}>🛒 Add to Cart</Text>
+                            <Icon name="cart-outline" size={16} color="#333" style={{ marginRight: 4 }} />
+                            <Text style={styles.addToCartText}>Add to Cart</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity onPress={() => handleViewProduct(item)}>
-                            <Text>👁️</Text>
+                        <TouchableOpacity 
+                            onPress={() => handleViewProduct(item)}
+                            style={styles.viewButton}
+                        >
+                            <Icon name="eye-outline" size={24} color="#666" />
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -313,7 +415,12 @@ const styles = StyleSheet.create({
         margin: 10,
         borderRadius: 8,
     },
-    productImage: { width: 90, height: 90, borderRadius: 8 },
+    productImage: { 
+        width: 90, 
+        height: 90, 
+        borderRadius: 8,
+        backgroundColor: '#f5f5f5', // Background color for placeholder
+    },
     productDetails: { flex: 1, paddingLeft: 10 },
     productName: { fontSize: 16, fontWeight: 'bold', color: '#6c4a00' },
     productPrice: { fontSize: 15, fontWeight: 'bold', marginTop: 4 },
@@ -325,15 +432,33 @@ const styles = StyleSheet.create({
     quantityValue: { marginHorizontal: 10 },
     actionIcons: {
         flexDirection: 'row',
+        alignItems: 'center',
         justifyContent: 'space-between',
         marginTop: 8,
+        gap: 8,
+    },
+    wishlistButton: {
+        padding: 4,
     },
     addToCartButton: {
         backgroundColor: '#e6d36f',
-        padding: 6,
+        paddingVertical: 6,
+        paddingHorizontal: 10,
         borderRadius: 5,
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        justifyContent: 'center',
+        marginHorizontal: 8,
     },
-    addToCartText: { fontWeight: 'bold' },
+    addToCartText: { 
+        fontWeight: 'bold',
+        color: '#333',
+        fontSize: 14,
+    },
+    viewButton: {
+        padding: 4,
+    },
 });
 
 export default ProductListings;

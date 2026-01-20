@@ -10,6 +10,7 @@ import {
   Image,
   ScrollView,
   ActivityIndicator,
+  KeyboardAvoidingView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
@@ -30,6 +31,7 @@ const SignInScreen = ({ navigation: propNavigation }) => {
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSendOtp = () => {
     if (!phone || phone.length !== 10) {
@@ -85,8 +87,17 @@ const SignInScreen = ({ navigation: propNavigation }) => {
 
       Alert.alert('Welcome', 'Signed in successfully to Thiaworld Jewellery!');
       
-      // ✅ FIX 3: Removed navigation.reset() - navigation doesn't exist
-      // If you need navigation, restore NavigationContainer in App.js
+      // ✅ Navigate to Home screen after successful login
+      if (navigation && navigation.reset) {
+        // Reset navigation stack and go to Home
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Home' }],
+        });
+      } else if (navigation && navigation.navigate) {
+        // Fallback: navigate to Home
+        navigation.navigate('Home');
+      }
     } catch (error) {
       console.error('Login error:', error);
       Alert.alert('Login Failed', error.message || 'Unable to sign in. Please try again.');
@@ -96,12 +107,18 @@ const SignInScreen = ({ navigation: propNavigation }) => {
   };
 
   return (
-    <ScrollView 
-      style={styles.scrollView}
-      contentContainerStyle={styles.scrollContent}
-      keyboardShouldPersistTaps="handled"
+    <KeyboardAvoidingView
+      style={styles.keyboardView}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
-      <View style={styles.container}>
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.container}>
       {/* Header with Logo */}
       <View style={styles.header}>
         <Image source={THIAWORLDLOGO} style={styles.logo} />
@@ -168,14 +185,23 @@ const SignInScreen = ({ navigation: propNavigation }) => {
       {/* Password Input */}
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Password</Text>
+        <View style={styles.passwordContainer}>
           <TextInput
             placeholder="Enter your password"
             value={password}
             onChangeText={setPassword}
-            style={styles.input}
-            secureTextEntry
+            style={styles.passwordInput}
+            secureTextEntry={!showPassword}
             editable={!loading}
           />
+          <TouchableOpacity
+            onPress={() => setShowPassword(!showPassword)}
+            style={styles.eyeIcon}
+            disabled={loading}
+          >
+            <Text style={styles.eyeIconText}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Sign In Button */}
@@ -212,17 +238,22 @@ const SignInScreen = ({ navigation: propNavigation }) => {
         )}
       </Text>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
+  keyboardView: {
+    flex: 1,
+  },
   scrollView: {
     flex: 1,
     backgroundColor: '#FFFDF5',
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 100,
+    flexGrow: 1,
   },
   container: {
     flex: 1,
@@ -269,6 +300,28 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 10,
     fontSize: 15,
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ccc',
+    backgroundColor: '#FAFAFA',
+    borderRadius: 10,
+    paddingRight: 10,
+  },
+  passwordInput: {
+    flex: 1,
+    padding: 14,
+    fontSize: 15,
+  },
+  eyeIcon: {
+    padding: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  eyeIconText: {
+    fontSize: 20,
   },
   orText: {
     textAlign: 'center',

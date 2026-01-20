@@ -18,14 +18,17 @@ import {
 import Cart from '../assets/icons/cart.png';
 import Bell from '../assets/icons/notification.png';
 import { useCart } from '../contexts/CartContext';
-import { createDrawerNavigator } from '@react-navigation/drawer';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+// ✅ Removed drawer imports - drawer requires reanimated
+// import { createDrawerNavigator } from '@react-navigation/drawer';
+// import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import axios from 'axios';
 import { useWishlist } from '../contexts/WishlistContext';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useTheme } from '../contexts/ThemeContext';
 
-const Drawer = createDrawerNavigator();
-const Stack = createNativeStackNavigator();
+// ✅ Removed unused navigator declarations
+// const Drawer = createDrawerNavigator();
+// const Stack = createNativeStackNavigator();
 
 const { width } = Dimensions.get('window');
 
@@ -99,6 +102,7 @@ const Header = ({ navigation, cartCount, onSearchPress, onCartPress, onNotifPres
       onPress={onSearchPress}
       activeOpacity={0.8}
     >
+      <Icon name="search" size={16} color="#888" style={styles.searchIcon} />
       <Text style={styles.searchPlaceholder}>Search for products</Text>
     </TouchableOpacity>
 
@@ -200,6 +204,16 @@ const Section = ({ title, rightLabel, onRightPress, children }) => (
 const ProductCard = ({ item, onPress, small }) => {
   const { isWishlisted, toggleWishlist } = useWishlist();
 
+  const handleWishlistToggle = async (e) => {
+    e.stopPropagation();
+    try {
+      await toggleWishlist(item.id);
+    } catch (error) {
+      // Error handling is done in WishlistContext
+      console.log('Wishlist toggle error:', error);
+    }
+  };
+
   return (
     <TouchableOpacity
       style={[
@@ -207,6 +221,8 @@ const ProductCard = ({ item, onPress, small }) => {
         small && styles.cardSmall,
         { position: 'relative' }
       ]}
+      onPress={() => onPress?.(item)}
+      activeOpacity={0.8}
     >
       {/* Wishlist Icon */}
       <TouchableOpacity
@@ -215,11 +231,11 @@ const ProductCard = ({ item, onPress, small }) => {
           top: 8,
           right: 8,
           zIndex: 10,
+          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+          borderRadius: 15,
+          padding: 4,
         }}
-        onPress={(e) => {
-          e.stopPropagation();
-          toggleWishlist(item.id);
-        }}
+        onPress={handleWishlistToggle}
       >
         <Icon
           name={isWishlisted(item.id) ? 'heart' : 'heart-outline'}
@@ -294,6 +310,7 @@ const TrustStrip = ({ navigation }) => (
 // ------------------------------
 export default function HomeScreen({ navigation }) {
   const { cartCount, cartReady } = useCart();
+  const { colors, isDark } = useTheme();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -460,24 +477,36 @@ export default function HomeScreen({ navigation }) {
     />
   );
 
+  // ✅ Create dynamic styles based on theme
+  const dynamicStyles = {
+    ...styles,
+    container: { ...styles.container, backgroundColor: colors.background },
+    header: { ...styles.header, backgroundColor: colors.header },
+    searchBar: { ...styles.searchBar, backgroundColor: isDark ? colors.surface : '#f2f2f2' },
+    card: { ...styles.card, backgroundColor: colors.card },
+    trust: { ...styles.trust, backgroundColor: colors.surface },
+    skeletonBanner: { ...styles.skeletonBanner, backgroundColor: colors.surface },
+    skeletonRow: { ...styles.skeletonRow, backgroundColor: colors.surface },
+  };
+
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle={Platform.OS === 'ios' ? 'dark-content' : 'light-content'} />
+      <SafeAreaView style={dynamicStyles.container}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
         <Header cartCount={cartCount} navigation={navigation} onSearchPress={() => navigate('Search')} onCartPress={() => navigate('Cart')} onNotifPress={() => navigate('Cart')} />
-        <View style={styles.skeletonBanner} />
-        <View style={styles.skeletonRow} />
-        <View style={styles.skeletonRow} />
+        <View style={dynamicStyles.skeletonBanner} />
+        <View style={dynamicStyles.skeletonRow} />
+        <View style={dynamicStyles.skeletonRow} />
       </SafeAreaView>
     );
   }
 
   if (error) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={dynamicStyles.container}>
         <Header navigation={navigation} onSearchPress={() => navigate('Search')} onCartPress={() => navigate('Cart')} onNotifPress={() => navigate('Notifications')} />
         <View style={styles.errorBox}>
-          <Text style={styles.errorText}>Something went wrong. Please try again.</Text>
+          <Text style={[styles.errorText, { color: colors.text }]}>Something went wrong. Please try again.</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={() => setError(null)}>
             <Text style={styles.retryTxt}>Retry</Text>
           </TouchableOpacity>
@@ -487,8 +516,8 @@ export default function HomeScreen({ navigation }) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle={Platform.OS === 'ios' ? 'dark-content' : 'light-content'} />
+    <SafeAreaView style={dynamicStyles.container}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <ScrollView
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
@@ -541,7 +570,8 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: { flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: '#fff', elevation: 4 },
-  searchBar: { flex: 1, backgroundColor: '#f2f2f2', borderRadius: 20, paddingHorizontal: 12, marginHorizontal: 8, height: 40, justifyContent: 'center' },
+  searchBar: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#f2f2f2', borderRadius: 20, paddingHorizontal: 12, marginHorizontal: 8, height: 40, justifyContent: 'flex-start' },
+  searchIcon: { marginRight: 6 },
   searchPlaceholder: { color: '#888' },
   iconWrapper: { marginHorizontal: 4 },
   icon: { width: 22, height: 22, resizeMode: 'contain' },

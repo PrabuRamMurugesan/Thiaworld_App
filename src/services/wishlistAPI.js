@@ -4,15 +4,29 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const API_BASE = "https://thiaworld.bbscart.com/api";
 
 const authConfig = async () => {
-    const raw = await AsyncStorage.getItem("bbsUser");
-    if (!raw) return {};
+    // ✅ Try THIAWORLD_TOKEN first (current app standard)
+    let token = await AsyncStorage.getItem("THIAWORLD_TOKEN");
+    
+    // ✅ Fallback to bbsUser token (legacy support)
+    if (!token) {
+        const raw = await AsyncStorage.getItem("bbsUser");
+        if (raw) {
+            try {
+                const parsed = JSON.parse(raw);
+                token = parsed?.token;
+            } catch (e) {
+                console.log('Error parsing bbsUser:', e);
+            }
+        }
+    }
 
-    const parsed = JSON.parse(raw);
-    if (!parsed?.token) return {};
+    if (!token) {
+        return {};
+    }
 
     return {
         headers: {
-            Authorization: `Bearer ${parsed.token}`,
+            Authorization: `Bearer ${token}`,
         },
     };
 };
@@ -25,7 +39,17 @@ export const getWishlist = async () => {
             return [];
         }
         const res = await axios.get(`${API_BASE}/wishlist`, config);
-        return res.data || [];
+        
+        // ✅ Handle different response structures
+        if (Array.isArray(res.data)) {
+            return res.data;
+        } else if (res.data?.items && Array.isArray(res.data.items)) {
+            return res.data.items;
+        } else if (res.data?.data && Array.isArray(res.data.data)) {
+            return res.data.data;
+        }
+        
+        return [];
     } catch (error) {
         console.log('getWishlist error:', error?.response?.status || error.message);
         // Return empty array on error instead of throwing

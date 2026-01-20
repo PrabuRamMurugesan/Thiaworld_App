@@ -3,12 +3,14 @@ import React from 'react';
 import ThiaLogo from '../assets/thiaworldlogo.png';
 const ThiaSecurePlan = () => {
     return (
-        <ScrollView style={styles.container}>
-            <Image
-                source={ThiaLogo}
-                style={styles.image}
-                resizeMode="contain"
-            />
+        <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+            <View style={styles.logoContainer}>
+                <Image
+                    source={ThiaLogo}
+                    style={styles.image}
+                    resizeMode="contain"
+                />
+            </View>
             {/* Title */}
             <Text style={styles.title}>Thia Secure Plan</Text>
             <Text style={styles.subtitle}>Your Jewellery. Your Way. Your Control.</Text>
@@ -49,8 +51,16 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#fffaf5',
+    },
+    scrollContent: {
         padding: 20,
-        
+        paddingTop: 10, // Reduced top padding
+    },
+    logoContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 15, // Reduced margin
+        paddingHorizontal: 10, // Reduced horizontal padding
     },
     title: {
         fontSize: 28,
@@ -117,8 +127,8 @@ const styles = StyleSheet.create({
         fontStyle: 'italic',
     },
     image: {
-        width: 400,
-        height: 350,
-        marginBottom: 30,
+        width: 250,
+        height: 200,
+        alignSelf: 'center', // Ensure center alignment
     },
 });

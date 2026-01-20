@@ -85,7 +85,7 @@ const TermsAndConditionsPage = () => {
     <View style={styles.container}>
 
 
-      <ScrollView style={styles.scrollContainer} contentContainerStyle={{ paddingBottom: 30 }}>
+      <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
         {/* Logo */}
         <View style={styles.logoContainer}>
           <Image
@@ -122,15 +122,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   scrollContainer: {
+    flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: 20,
+    paddingTop: 10, // Reduced top padding
+    paddingBottom: 30,
   },
   logoContainer: {
     alignItems: 'center',
-    marginVertical: 15,
+    justifyContent: 'center',
+    marginTop: 5, // Reduced top margin
+    marginBottom: 10, // Reduced bottom margin
+    paddingHorizontal: 10, // Reduced horizontal padding
   },
   logo: {
-    width: width * 0.6,
-    aspectRatio: 1,
+    width: width * 0.5, // Reduced width from 0.6 to 0.5
+    height: width * 0.4, // Set specific height instead of aspectRatio
+    alignSelf: 'center', // Ensure center alignment
   },
   pageTitle: {
     fontSize: 24,

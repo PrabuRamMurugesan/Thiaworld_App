@@ -91,7 +91,7 @@ const DashboardScreen = () => {
       <View style={styles.section}>
         <TouchableOpacity
           style={styles.card}
-          onPress={() => Linking.openURL('https://bbscart.com/')}
+          onPress={() => Linking.openURL('https://bbscart.com/vendor-home')}
         >
           <Text style={styles.emoji}>📝</Text>
           <View style={styles.textContainer}>

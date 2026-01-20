@@ -1,8 +1,8 @@
 module.exports = {
   presets: ['module:@react-native/babel-preset'],
   plugins: [
-    // ✅ Reanimated plugin removed - package uninstalled
-    // Reinstall later: npm install react-native-reanimated --save
-    // Then uncomment: 'react-native-reanimated/plugin',
+    // ✅ Reanimated plugin removed - package causing build issues
+    // If you need reanimated later, install it and uncomment:
+    // 'react-native-reanimated/plugin',
   ],
 };

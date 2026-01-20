@@ -14,27 +14,54 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
+import { useCart } from "../contexts/CartContext";
 
 const API_BASE = "https://thiaworld.bbscart.com/api";
 
 export default function JewelryWishlist({ navigation }) {
+  const { addToCart } = useCart();
   const [wishlist, setWishlist] = useState([]);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [selectMode, setSelectMode] = useState(false);
   const [compareVisible, setCompareVisible] = useState(false);
 
+  // ✅ Add focus listener to refresh wishlist when screen is focused
   useEffect(() => {
+    const unsubscribe = navigation?.addListener?.('focus', () => {
+      loadWishlist();
+    });
+
     loadWishlist();
-  }, []);
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [navigation]);
 
   const getAuthConfig = async () => {
-    const raw = await AsyncStorage.getItem("bbsUser");
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    if (!parsed?.token) return {};
+    // ✅ Try THIAWORLD_TOKEN first (current app standard)
+    let token = await AsyncStorage.getItem("THIAWORLD_TOKEN");
+    
+    // ✅ Fallback to bbsUser token (legacy support)
+    if (!token) {
+      const raw = await AsyncStorage.getItem("bbsUser");
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          token = parsed?.token;
+        } catch (e) {
+          console.log('Error parsing bbsUser:', e);
+        }
+      }
+    }
+
+    if (!token) {
+      return {};
+    }
+
     return {
       headers: {
-        Authorization: `Bearer ${parsed.token}`,
+        Authorization: `Bearer ${token}`,
       },
     };
   };
@@ -54,6 +81,8 @@ export default function JewelryWishlist({ navigation }) {
           image: p.images?.[0]
             ? `https://thiaworld.bbscart.com/uploads/${p.images[0].split("|")[0]}`
             : "https://via.placeholder.com/150",
+          category: p.category || 'gold', // ✅ Add category for cart
+          images: p.images || [], // ✅ Keep images array for cart
           inStock: true,
           note: "",
           alert: false,
@@ -88,13 +117,66 @@ export default function JewelryWishlist({ navigation }) {
     }
   };
 
-  const moveToCart = (item) => {
-    Alert.alert("Moved to Cart", `${item.name} has been added to your cart.`);
-    setWishlist((prev) => prev.filter((i) => i.id !== item.id));
+  const moveToCart = async (item) => {
+    try {
+      // ✅ If category is missing, try to fetch product details
+      let category = item.category;
+      
+      if (!category || category === 'gold') {
+        try {
+          const config = await getAuthConfig();
+          const productRes = await axios.get(`${API_BASE}/products/${item.id}`, config);
+          const product = productRes.data?.product || productRes.data || {};
+          category = product.category || 'gold';
+        } catch (fetchError) {
+          console.log('Could not fetch product details, using default category:', fetchError.message);
+          category = 'gold'; // Default to gold if fetch fails
+        }
+      }
+
+      // ✅ Prepare product for cart with all required fields
+      const cartProduct = {
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        category: String(category || 'gold').toLowerCase(), // ✅ Ensure category is lowercase string
+        image: item.image,
+        images: item.images || [],
+        // Include other fields that might be useful
+        mrp: item.oldPrice,
+        quantity: 1, // Start with quantity 1
+      };
+
+      // ✅ Add to cart using CartContext
+      addToCart(cartProduct);
+
+      // ✅ Show success message
+      Alert.alert(
+        "Added to Cart",
+        `${item.name} has been added to your cart.`,
+        [
+          {
+            text: "Continue Shopping",
+            style: "cancel",
+          },
+          {
+            text: "View Cart",
+            onPress: () => navigation.navigate("Cart"),
+          },
+        ]
+      );
+
+      // ✅ Remove from wishlist after successful add
+      setWishlist((prev) => prev.filter((i) => i.id !== item.id));
+    } catch (error) {
+      console.error("Error moving to cart:", error);
+      Alert.alert("Error", "Failed to add item to cart. Please try again.");
+    }
   };
 
   const goToProductDetail = (item) => {
-    navigation.navigate("ProductDetail", { id: item.id });
+    // ✅ Use correct route name
+    navigation.navigate("ProductDetails", { id: item.id });
   };
 
   const toggleAlert = (id) => {
