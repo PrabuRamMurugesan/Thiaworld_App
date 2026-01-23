@@ -1,8 +1,8 @@
 module.exports = {
   presets: ['module:@react-native/babel-preset'],
   plugins: [
-    // ✅ Reanimated plugin removed - package causing build issues
-    // If you need reanimated later, install it and uncomment:
-    // 'react-native-reanimated/plugin',
+    // ⚠️ CRITICAL: react-native-reanimated/plugin MUST be the LAST plugin
+    // Required for drawer navigation to work properly
+    'react-native-reanimated/plugin',
   ],
 };

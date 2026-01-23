@@ -1,11 +1,13 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack'; // ✅ JavaScript-only (no drawer - drawer requires reanimated)
+import { createStackNavigator } from '@react-navigation/stack';
+import { createDrawerNavigator } from '@react-navigation/drawer';
 import { Image } from 'react-native';
 import { CartProvider } from './src/contexts/CartContext';
 import { WishlistProvider } from './src/contexts/WishlistContext';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import ErrorBoundary from './src/components/ErrorBoundary';
+import CustomDrawer from './src/components/CustomDrawer';
 
 // ✅ Logo for header
 const ThiaworldLogo = require('./src/assets/thiaworldlogo.png');
@@ -46,7 +48,8 @@ import GoldPlanScreen from './src/screens/GoldPlanScreen';
 import TryAtHomeScreen from './src/screens/TryAtHomeScreen';
 
 // Navigators
-const Stack = createStackNavigator(); // ✅ JavaScript-only (safe, no drawer - drawer requires reanimated)
+const Stack = createStackNavigator();
+const Drawer = createDrawerNavigator();
 
 /* ------------------ Auth Stack ------------------ */
 function AuthStack() {
@@ -75,6 +78,50 @@ function AuthStack() {
         }}
       />
     </Stack.Navigator>
+  );
+}
+
+/* ------------------ Home Drawer Navigator ------------------ */
+function HomeDrawer() {
+  const { colors, isDark } = useTheme();
+  
+  return (
+    <Drawer.Navigator
+      drawerContent={(props) => <CustomDrawer {...props} />}
+      initialRouteName="HomeMain"
+      screenOptions={{
+        headerShown: true,
+        drawerType: 'front', // Use 'front' type
+        overlayColor: 'rgba(0, 0, 0, 0.5)', // Add overlay for better UX
+        drawerStyle: {
+          backgroundColor: colors.background,
+          width: 280,
+        },
+        headerStyle: {
+          backgroundColor: colors.header,
+          height: 80,
+          elevation: 0,
+          shadowOpacity: 0,
+        },
+        headerTintColor: colors.text,
+        headerTitleStyle: {
+          color: colors.text,
+          fontWeight: '600',
+        },
+        drawerActiveTintColor: colors.primary,
+        drawerInactiveTintColor: colors.text,
+        swipeEnabled: true,
+        swipeEdgeWidth: 50,
+      }}
+    >
+      <Drawer.Screen
+        name="HomeMain"
+        component={Home}
+        options={{
+          headerShown: false, // Hide drawer header, use Home screen's custom header
+        }}
+      />
+    </Drawer.Navigator>
   );
 }
 
@@ -199,31 +246,9 @@ function AppNavigator() {
 
               <Stack.Screen
                 name="Home"
-                component={Home}
+                component={HomeDrawer}
                 options={{
-                  headerTitle: () => (
-                    <Image
-                      source={ThiaworldLogo}
-                      style={{
-                        width: 360,
-                        height: 140,
-                        resizeMode: 'contain',
-                      }}
-                    />
-                  ),
-                  headerTitleAlign: 'center',
-                  headerStyle: {
-                    backgroundColor: colors.header,
-                    height: 80,
-                    elevation: 0,
-                    shadowOpacity: 0,
-                  },
-                  headerTitleContainerStyle: {
-                    left: 0,
-                    right: 0,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  },
+                  headerShown: false,
                 }}
               />
 

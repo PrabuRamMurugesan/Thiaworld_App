@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
+import { sendOTP, verifyOTP, resendOTP } from '../services/otpService';
 
 // ✅ FIX 1: Use require() instead of import for images (React Native requirement)
 const THIAWORLDLOGO = require('../assets/thiaworldlogo.png');
@@ -30,20 +31,166 @@ const SignInScreen = ({ navigation: propNavigation }) => {
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [sendingOTP, setSendingOTP] = useState(false);
+  const [verifyingOTP, setVerifyingOTP] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [otpTimer, setOtpTimer] = useState(0);
+  const [canResendOTP, setCanResendOTP] = useState(false);
 
-  const handleSendOtp = () => {
+  // Timer for OTP resend
+  useEffect(() => {
+    let interval = null;
+    if (otpTimer > 0) {
+      interval = setInterval(() => {
+        setOtpTimer((prev) => {
+          if (prev <= 1) {
+            setCanResendOTP(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      setCanResendOTP(true);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [otpTimer]);
+
+  const handleSendOtp = async () => {
     if (!phone || phone.length !== 10) {
       Alert.alert('Invalid Phone', 'Enter a valid 10-digit phone number.');
       return;
     }
 
-    setOtpSent(true);
-    Alert.alert('OTP Sent', 'An OTP has been sent to your registered number.');
+    try {
+      setSendingOTP(true);
+      setCanResendOTP(false);
+      
+      const result = await sendOTP(phone);
+      
+      if (result.success) {
+        setOtpSent(true);
+        setOtpTimer(60); // 60 seconds cooldown for resend
+        Alert.alert('OTP Sent', result.message);
+        
+        // For development: Show OTP in console (remove in production)
+        if (__DEV__ && result.otp) {
+          console.log('🔐 OTP for testing:', result.otp);
+        }
+      } else {
+        Alert.alert('Error', result.message);
+      }
+    } catch (error) {
+      console.error('Error sending OTP:', error);
+      Alert.alert('Error', 'Failed to send OTP. Please try again.');
+    } finally {
+      setSendingOTP(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    if (!canResendOTP) {
+      Alert.alert('Please Wait', `You can resend OTP in ${otpTimer} seconds.`);
+      return;
+    }
+
+    await handleSendOtp();
+  };
+
+  const handleVerifyOTP = async () => {
+    if (!otp || otp.length !== 6) {
+      Alert.alert('Invalid OTP', 'Please enter a valid 6-digit OTP.');
+      return;
+    }
+
+    try {
+      setVerifyingOTP(true);
+      
+      const result = await verifyOTP(phone, otp);
+      
+      if (result.success) {
+        setOtpVerified(true);
+        Alert.alert('Success', result.message);
+      } else {
+        Alert.alert('Verification Failed', result.message);
+      }
+    } catch (error) {
+      console.error('Error verifying OTP:', error);
+      Alert.alert('Error', 'Failed to verify OTP. Please try again.');
+    } finally {
+      setVerifyingOTP(false);
+    }
   };
 
   const handleSignIn = async () => {
+    // If OTP is sent but not verified, require OTP verification first
+    if (otpSent && !otpVerified) {
+      Alert.alert('OTP Required', 'Please verify the OTP sent to your phone number.');
+      return;
+    }
+
+    // For OTP-based login (phone only, no password)
+    if (phone && otpVerified && !password) {
+      // OTP-based login - proceed with phone only
+      const payload = {
+        phone,
+        loginMethod: 'otp',
+        createdFrom: 'thiaworld',
+      };
+
+      try {
+        setLoading(true);
+
+        const response = await fetch(LOGIN_API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Login failed');
+        }
+
+        if (!data.token) {
+          throw new Error('Token not received from server');
+        }
+
+        // ✅ Save token & user for auto-login
+        await AsyncStorage.setItem('THIAWORLD_TOKEN', data.token);
+        await AsyncStorage.setItem(
+          'THIAWORLD_USER',
+          JSON.stringify(data.user || {})
+        );
+
+        Alert.alert('Welcome', 'Signed in successfully to Thiaworld Jewellery!');
+        
+        // ✅ Navigate to Home screen after successful login
+        if (navigation && navigation.reset) {
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Home' }],
+          });
+        } else if (navigation && navigation.navigate) {
+          navigation.navigate('Home');
+        }
+      } catch (error) {
+        console.error('Login error:', error);
+        Alert.alert('Login Failed', error.message || 'Unable to sign in. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Traditional password-based login
     if ((!email && !phone) || !password) {
       Alert.alert('Error', 'Please enter required fields.');
       return;
@@ -159,50 +306,92 @@ const SignInScreen = ({ navigation: propNavigation }) => {
       </View>
 
       {/* OTP Section */}
-      {!otpSent ? (
-        <TouchableOpacity 
-          style={[styles.button, loading && styles.buttonDisabled]} 
-          onPress={handleSendOtp}
-          disabled={loading}
-        >
-          <Text style={styles.buttonText}>Send OTP</Text>
-        </TouchableOpacity>
-      ) : (
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Verify OTP</Text>
-            <TextInput
-              placeholder="Enter 6-digit OTP"
-              value={otp}
-              onChangeText={setOtp}
-              style={styles.input}
-              keyboardType="numeric"
-              maxLength={6}
-              editable={!loading}
-            />
-        </View>
+      {phone && phone.length === 10 && (
+        <>
+          {!otpSent ? (
+            <TouchableOpacity 
+              style={[styles.button, (loading || sendingOTP) && styles.buttonDisabled]} 
+              onPress={handleSendOtp}
+              disabled={loading || sendingOTP}
+            >
+              {sendingOTP ? (
+                <ActivityIndicator color="#222" />
+              ) : (
+                <Text style={styles.buttonText}>Send OTP</Text>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Verify OTP</Text>
+              <TextInput
+                placeholder="Enter 6-digit OTP"
+                value={otp}
+                onChangeText={setOtp}
+                style={styles.input}
+                keyboardType="numeric"
+                maxLength={6}
+                editable={!loading && !verifyingOTP}
+              />
+              {otp.length === 6 && !otpVerified && (
+                <TouchableOpacity
+                  style={[styles.button, styles.verifyButton, verifyingOTP && styles.buttonDisabled]}
+                  onPress={handleVerifyOTP}
+                  disabled={verifyingOTP}
+                >
+                  {verifyingOTP ? (
+                    <ActivityIndicator color="#222" />
+                  ) : (
+                    <Text style={styles.buttonText}>Verify OTP</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+              {otpSent && (
+                <View style={styles.resendContainer}>
+                  {otpTimer > 0 ? (
+                    <Text style={styles.resendText}>
+                      Resend OTP in {otpTimer}s
+                    </Text>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={handleResendOTP}
+                      disabled={!canResendOTP || sendingOTP}
+                    >
+                      <Text style={styles.resendLink}>Resend OTP</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+              {otpVerified && (
+                <Text style={styles.successText}>✓ OTP Verified Successfully</Text>
+              )}
+            </View>
+          )}
+        </>
       )}
 
-      {/* Password Input */}
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Password</Text>
-        <View style={styles.passwordContainer}>
-          <TextInput
-            placeholder="Enter your password"
-            value={password}
-            onChangeText={setPassword}
-            style={styles.passwordInput}
-            secureTextEntry={!showPassword}
-            editable={!loading}
-          />
-          <TouchableOpacity
-            onPress={() => setShowPassword(!showPassword)}
-            style={styles.eyeIcon}
-            disabled={loading}
-          >
-            <Text style={styles.eyeIconText}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
-          </TouchableOpacity>
+      {/* Password Input - Optional if OTP is verified */}
+      {(!otpSent || !otpVerified) && (
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Password {otpSent && otpVerified ? '(Optional)' : ''}</Text>
+          <View style={styles.passwordContainer}>
+            <TextInput
+              placeholder="Enter your password"
+              value={password}
+              onChangeText={setPassword}
+              style={styles.passwordInput}
+              secureTextEntry={!showPassword}
+              editable={!loading}
+            />
+            <TouchableOpacity
+              onPress={() => setShowPassword(!showPassword)}
+              style={styles.eyeIcon}
+              disabled={loading}
+            >
+              <Text style={styles.eyeIconText}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      )}
 
       {/* Sign In Button */}
       <TouchableOpacity
@@ -360,6 +549,30 @@ const styles = StyleSheet.create({
   link: {
     color: '#B8860B',
     fontWeight: 'bold',
+  },
+  verifyButton: {
+    marginTop: 10,
+    marginBottom: 0,
+  },
+  resendContainer: {
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  resendText: {
+    fontSize: 14,
+    color: '#888',
+  },
+  resendLink: {
+    fontSize: 14,
+    color: '#B8860B',
+    fontWeight: 'bold',
+  },
+  successText: {
+    fontSize: 14,
+    color: '#28a745',
+    fontWeight: '600',
+    marginTop: 8,
+    textAlign: 'center',
   },
 });
 

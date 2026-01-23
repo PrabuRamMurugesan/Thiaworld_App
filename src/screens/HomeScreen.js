@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import Cart from '../assets/icons/cart.png';
 import Bell from '../assets/icons/notification.png';
+import ThiaworldLogo from '../assets/thiaworldlogo.png';
 import { useCart } from '../contexts/CartContext';
 // ✅ Removed drawer imports - drawer requires reanimated
 // import { createDrawerNavigator } from '@react-navigation/drawer';
@@ -86,38 +87,61 @@ const useMidnightCountdown = () => {
 // ------------------------------
 // Header with Drawer Button
 // ------------------------------
-const Header = ({ navigation, cartCount, onSearchPress, onCartPress, onNotifPress }) => (
-  <View style={styles.header}>
-    {/* Notification Icon */}
-    <TouchableOpacity style={styles.iconWrapper} onPress={onNotifPress}>
-      <Image source={Bell} style={styles.icon} />
-      <View style={styles.badge}>
-        <Text style={styles.badgeText}>3</Text>
+const Header = ({ navigation, cartCount, onSearchPress, onCartPress, onNotifPress }) => {
+  const { colors } = useTheme();
+  
+  return (
+    <View style={styles.headerContainer}>
+      {/* Logo Row - Top */}
+      <View style={styles.logoRow}>
+        <Image 
+          source={ThiaworldLogo} 
+          style={styles.logo} 
+          resizeMode="contain"
+        />
       </View>
-    </TouchableOpacity>
 
-    {/* Search Bar */}
-    <TouchableOpacity
-      style={styles.searchBar}
-      onPress={onSearchPress}
-      activeOpacity={0.8}
-    >
-      <Icon name="search" size={16} color="#888" style={styles.searchIcon} />
-      <Text style={styles.searchPlaceholder}>Search for products</Text>
-    </TouchableOpacity>
+      {/* Navigation Row - Bottom */}
+      <View style={styles.navRow}>
+        {/* Drawer Menu Button */}
+        <TouchableOpacity 
+          style={styles.iconWrapper} 
+          onPress={() => navigation?.openDrawer?.()}
+        >
+          <Icon name="menu" size={24} color={colors.text} />
+        </TouchableOpacity>
 
-    {/* Cart Icon */}
-    <TouchableOpacity style={styles.iconWrapper} onPress={onCartPress}>
-      <Image source={Cart} style={styles.icon} />
-      {cartCount > 0 && (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{cartCount}</Text>
-        </View>
-      )}
+        {/* Search Bar */}
+        <TouchableOpacity
+          style={styles.searchBar}
+          onPress={onSearchPress}
+          activeOpacity={0.8}
+        >
+          <Icon name="search" size={16} color="#888" style={styles.searchIcon} />
+          <Text style={styles.searchPlaceholder}>Search for products</Text>
+        </TouchableOpacity>
 
-    </TouchableOpacity>
-  </View>
-);
+        {/* Notification Icon */}
+        <TouchableOpacity style={styles.iconWrapper} onPress={onNotifPress}>
+          <Image source={Bell} style={styles.icon} />
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>3</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Cart Icon */}
+        <TouchableOpacity style={styles.iconWrapper} onPress={onCartPress}>
+          <Image source={Cart} style={styles.icon} />
+          {cartCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{cartCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
 
 // ------------------------------
 // Hero Carousel
@@ -569,7 +593,10 @@ export default function HomeScreen({ navigation }) {
 // ------------------------------
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
-  header: { flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: '#fff', elevation: 4 },
+  headerContainer: { backgroundColor: '#fff', elevation: 4 },
+  logoRow: { alignItems: 'center', justifyContent: 'center', paddingVertical: 8, paddingHorizontal: 12 },
+  logo: { width: 280, height: 100 },
+  navRow: { flexDirection: 'row', alignItems: 'center', padding: 8, paddingTop: 4 },
   searchBar: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#f2f2f2', borderRadius: 20, paddingHorizontal: 12, marginHorizontal: 8, height: 40, justifyContent: 'flex-start' },
   searchIcon: { marginRight: 6 },
   searchPlaceholder: { color: '#888' },
