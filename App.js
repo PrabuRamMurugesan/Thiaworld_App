@@ -17,6 +17,7 @@ import ProductDetails from './src/screens/ProductDetail';
 import CartPage from './src/screens/CartScreen';
 import Notifications from './src/screens/Notifications';
 import ProfileSettingsScreen from './src/screens/ProfileSettingsScreen';
+import AppSettingsScreen from './src/screens/AppSettingsScreen';
 import UserAccount from './src/screens/UserAccount';
 import MyWalletStyled from './src/screens/MyWallet';
 import OrderHistory from './src/screens/OrderHistory';
@@ -428,6 +429,17 @@ function AppNavigator() {
                 component={ProfileSettingsScreen}
                 options={{
                   title: 'Profile Settings',
+                  headerStyle: { backgroundColor: colors.header },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { color: colors.text },
+                }}
+              />
+
+              <Stack.Screen
+                name="Settings"
+                component={AppSettingsScreen}
+                options={{
+                  title: 'App Settings',
                   headerStyle: { backgroundColor: colors.header },
                   headerTintColor: colors.text,
                   headerTitleStyle: { color: colors.text },
