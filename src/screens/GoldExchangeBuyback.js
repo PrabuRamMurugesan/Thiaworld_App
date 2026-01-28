@@ -12,7 +12,9 @@ import {
   FlatList,
   Image,
   Platform,
+  ActivityIndicator,
 } from "react-native";
+import { fetchGoldRates, fetchSilverRates } from '../services/goldRateAPI';
 
 /**
  * GoldExchangeBuyback.js
@@ -33,10 +35,11 @@ import {
  *  - Add authentication headers when calling APIs
  */
 
+// Default fallback rates (per gram) - will be replaced by API data
 const DEFAULT_RATES = {
-  gold24: 160000, // ₹ per 10g (example) — adapt to how you want units to display
-  gold22: 146000,
-  silver: 76000, // ₹ per kg or per 1000g depending on your unit system; we'll interpret as ₹/kg in comments
+  gold24: 15863, // ₹ per gram (fallback)
+  gold22: 14674, // ₹ per gram (fallback)
+  silver: 76, // ₹ per gram (fallback)
 };
 
 // Helper to format currency
@@ -46,12 +49,16 @@ const fmt = (num) => {
 };
 
 export default function GoldExchangeBuyback({ navigation }) {
-  // Live rates
+  // ScrollView ref for scrolling to results
+  const scrollViewRef = useRef(null);
+  
+  // Live rates (per gram)
   const [rates, setRates] = useState({
     gold24: DEFAULT_RATES.gold24,
     gold22: DEFAULT_RATES.gold22,
     silver: DEFAULT_RATES.silver,
     lastUpdated: new Date(),
+    loading: true,
   });
 
   // Calculator inputs
@@ -90,66 +97,162 @@ export default function GoldExchangeBuyback({ navigation }) {
   ); // default 3 days later
   const [pickup, setPickup] = useState(false);
 
-  // Auto-refresh simulation for "live" rates every 60s (mock)
-  const timerRef = useRef(null);
+  // Fetch live rates from API
+  const fetchRates = async () => {
+    try {
+      setRates(prev => ({ ...prev, loading: true }));
+      
+      // Fetch gold rates
+      const goldData = await fetchGoldRates();
+      if (goldData) {
+        setRates(prev => ({
+          ...prev,
+          gold24: goldData.rate24 || DEFAULT_RATES.gold24,
+          gold22: goldData.rate22 || DEFAULT_RATES.gold22,
+          lastUpdated: new Date(goldData.effectiveDate || Date.now()),
+          loading: false,
+        }));
+      } else {
+        // Keep default rates if API fails
+        setRates(prev => ({
+          ...prev,
+          loading: false,
+        }));
+      }
+      
+      // Fetch silver rates
+      const silverData = await fetchSilverRates();
+      if (silverData) {
+        setRates(prev => ({
+          ...prev,
+          silver: silverData.rate || DEFAULT_RATES.silver,
+        }));
+      }
+    } catch (error) {
+      console.log('Error fetching rates:', error);
+      setRates(prev => ({
+        ...prev,
+        loading: false,
+      }));
+    }
+  };
+
+  // Fetch rates on mount and refresh every 60 seconds
   useEffect(() => {
-    // Simulate rate fluctuation: +/- up to 0.5% every 60s
-    timerRef.current = setInterval(() => {
-      setRates((prev) => {
-        const fluctuate = (v) =>
-          Math.round(v * (1 + (Math.random() - 0.5) * 0.01)) // small random
-        return {
-          gold24: fluctuate(prev.gold24),
-          gold22: fluctuate(prev.gold22),
-          silver: fluctuate(prev.silver),
-          lastUpdated: new Date(),
-        };
-      });
+    fetchRates(); // Initial fetch
+    
+    const timerRef = setInterval(() => {
+      fetchRates(); // Refresh every 60 seconds
     }, 60000); // 60s
 
-    return () => clearInterval(timerRef.current);
+    return () => clearInterval(timerRef);
   }, []);
 
   // Core calculator: compute estimated final value (₹)
   const calculateEstimate = () => {
-    // Validate input
-    const w = parseFloat(weightGrams);
-    if (!w || w <= 0) {
-      Alert.alert("Invalid weight", "Please enter a valid weight in grams.");
+    console.log('Calculate button clicked');
+    console.log('Input values:', { weightGrams, purityPercent, wastagePercent, makingChargePerGram, metal });
+    console.log('Current rates:', rates);
+    
+    // Validate weight input
+    if (!weightGrams || weightGrams.trim() === '') {
+      Alert.alert("Weight Required", "Please enter the weight in grams.");
       return;
     }
-    // Rate unit decision:
-    // For gold rates we store per 10g in this mock. Convert to per gram: rate/10
-    const ratePerGram =
-      metal === "gold24"
-        ? rates.gold24 / 10
-        : metal === "gold22"
-        ? rates.gold22 / 10
-        : // for silver, our mock is per kg (76000) → per gram: 76
-          rates.silver / 1000; // adapt if you change units
+    
+    const w = parseFloat(weightGrams);
+    if (isNaN(w) || w <= 0) {
+      Alert.alert("Invalid Weight", "Please enter a valid weight in grams (e.g., 5.0).");
+      return;
+    }
+    
+    // Validate purity input
+    if (!purityPercent || purityPercent.trim() === '') {
+      Alert.alert("Purity Required", "Please enter the purity percentage.");
+      return;
+    }
+    
+    const purity = parseFloat(purityPercent);
+    if (isNaN(purity) || purity <= 0 || purity > 100) {
+      Alert.alert("Invalid Purity", "Please enter a valid purity percentage between 0 and 100 (e.g., 91.6 for 22K).");
+      return;
+    }
+    
+    // Get rate per gram based on selected metal
+    let ratePerGram = 0;
+    if (metal === "gold24") {
+      ratePerGram = rates.gold24;
+    } else if (metal === "gold22") {
+      ratePerGram = rates.gold22;
+    } else if (metal === "silver") {
+      ratePerGram = rates.silver;
+    }
 
-    const purity = parseFloat(purityPercent) / 100; // e.g., 91.6% -> 0.916 (for 22K)
-    const effectiveWeight = w * purity;
+    console.log('Selected rate per gram:', ratePerGram, 'for metal:', metal);
+
+    // Validate rate
+    if (!ratePerGram || isNaN(ratePerGram) || ratePerGram <= 0) {
+      Alert.alert(
+        "Rate Unavailable", 
+        `The ${metal === "gold24" ? "24K Gold" : metal === "gold22" ? "22K Gold" : "Silver"} rate is not available. Please wait for rates to load or try again later.`
+      );
+      return;
+    }
+
+    // Convert purity percentage to decimal (e.g., 91.6% -> 0.916 for 22K)
+    const purityDecimal = purity / 100;
+    const effectiveWeight = w * purityDecimal;
 
     // Gross value before deductions
     const gross = effectiveWeight * ratePerGram;
 
+    // Parse wastage and making charges
+    const wastagePercentValue = parseFloat(wastagePercent) || 0;
+    const makingChargesValue = parseFloat(makingChargePerGram || 0) || 0;
+
     // Apply wastage deduction (%) and making charges per gram (₹)
-    const wastage = (parseFloat(wastagePercent) / 100) * gross;
-    const makingCharges = parseFloat(makingChargePerGram || 0) * w;
+    const wastage = (wastagePercentValue / 100) * gross;
+    const makingCharges = makingChargesValue * w;
 
     // Final estimated value
     const finalValue = Math.max(0, Math.round(gross - wastage - makingCharges));
 
-    setEstimatedValue({
-      ratePerGram: Math.round(ratePerGram),
+    console.log('Calculation result:', {
+      ratePerGram,
+      effectiveWeight,
+      gross,
+      wastage,
+      makingCharges,
+      finalValue
+    });
+
+    // Set the estimated value state
+    const result = {
+      ratePerGram: Number(ratePerGram.toFixed(2)),
       purityPercent: Number(purityPercent),
       effectiveWeight: Number(effectiveWeight.toFixed(3)),
       gross: Math.round(gross),
       wastage: Math.round(wastage),
       makingCharges: Math.round(makingCharges),
       finalValue,
-    });
+    };
+
+    setEstimatedValue(result);
+    console.log('Estimated value set:', result);
+    
+    // Show success message
+    Alert.alert(
+      "Calculation Complete",
+      `Estimated value: ₹${finalValue.toLocaleString('en-IN')}\n\nScroll down to see detailed breakdown.`,
+      [{ text: "OK" }]
+    );
+    
+    // Scroll to result section after a short delay
+    setTimeout(() => {
+      if (scrollViewRef.current) {
+        scrollViewRef.current.scrollToEnd({ animated: true });
+      }
+    }, 500);
   };
 
   // Actions: Exchange / Credit to Wallet / Cash Transfer
@@ -283,7 +386,11 @@ export default function GoldExchangeBuyback({ navigation }) {
   const rateLabel = (m) => (m === "gold24" ? "24K" : m === "gold22" ? "22K" : "Silver");
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
+    <ScrollView 
+      ref={scrollViewRef}
+      style={styles.container} 
+      contentContainerStyle={{ paddingBottom: 40 }}
+    >
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Gold Exchange & Buyback</Text>
         <Text style={styles.headerSubtitle}>Transparent rates • Secure process • Quick credit</Text>
@@ -291,26 +398,31 @@ export default function GoldExchangeBuyback({ navigation }) {
 
       {/* Live Rates */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Live Rates</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <Text style={styles.cardTitle}>Live Rates</Text>
+          {rates.loading && <ActivityIndicator size="small" color="#b8860b" />}
+        </View>
 
         <View style={styles.rateRow}>
           <View>
             <Text style={styles.rateLabel}>22K Gold (per g)</Text>
-            <Text style={styles.rateValue}> {fmt(Math.round(rates.gold22 / 10))} </Text>
+            <Text style={styles.rateValue}>{fmt(Math.round(rates.gold22))}</Text>
           </View>
 
           <View>
             <Text style={styles.rateLabel}>24K Gold (per g)</Text>
-            <Text style={styles.rateValue}> {fmt(Math.round(rates.gold24 / 10))} </Text>
+            <Text style={styles.rateValue}>{fmt(Math.round(rates.gold24))}</Text>
           </View>
 
           <View>
             <Text style={styles.rateLabel}>Silver (per g)</Text>
-            <Text style={styles.rateValue}> {fmt(Math.round(rates.silver / 1000))} </Text>
+            <Text style={styles.rateValue}>{fmt(Math.round(rates.silver))}</Text>
           </View>
         </View>
 
-        <Text style={styles.smallText}>Last updated: {rates.lastUpdated.toLocaleString()}</Text>
+        <Text style={styles.smallText}>
+          Last updated: {rates.lastUpdated ? new Date(rates.lastUpdated).toLocaleString() : 'Loading...'}
+        </Text>
       </View>
 
       {/* Calculator */}

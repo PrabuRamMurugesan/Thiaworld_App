@@ -275,36 +275,36 @@ const normalizeProduct = (raw) => {
   const fallbackImage = pickFirst(p.image, p.product_img, p.productImg);
 
   const normalized = {
-    id: id ? String(id) : String(mockProduct.id),
-    name: name || mockProduct.name,
-    brand: pickFirst(p.brand, p.vendorName, p.vendor) || mockProduct.brand,
+    id: id ? String(id) : '',
+    name: name || '',
+    brand: pickFirst(p.brand, p.vendorName, p.vendor) || '',
     price: toNumber(price || 0),
     mrp: toNumber(mrp || 0),
-    description: description || mockProduct.description,
+    description: description || '',
 
-    images: images.length ? images : (fallbackImage ? [fallbackImage] : mockProduct.images),
-    image: fallbackImage || (images[0] || mockProduct.images[0]),
+    images: images.length ? images : (fallbackImage ? [buildImageUrl(fallbackImage)].filter(Boolean) : []),
+    image: fallbackImage ? buildImageUrl(fallbackImage) : (images[0] || null),
 
-    rating: toNumber(p.rating || p.avgRating || mockProduct.rating),
-    ratingCount: toNumber(p.ratingCount || p.ratingsCount || p.totalRatings || mockProduct.ratingCount),
-    reviewCount: toNumber(p.reviewCount || p.reviewsCount || p.totalReviews || mockProduct.reviewCount),
+    rating: toNumber(p.rating || p.avgRating || 0),
+    ratingCount: toNumber(p.ratingCount || p.ratingsCount || p.totalRatings || 0),
+    reviewCount: toNumber(p.reviewCount || p.reviewsCount || p.totalReviews || 0),
 
     // important for CartContext category routing
     category: (category || metal || '').toString().toLowerCase(),
 
-    // UI blocks
-    offers: Array.isArray(p.offers) ? p.offers : mockProduct.offers,
+    // UI blocks - use real data, empty arrays/objects if not available
+    offers: Array.isArray(p.offers) && p.offers.length > 0 ? p.offers : [],
     policies: {
-      cod: pickFirst(p.cod, p.cashOnDelivery, p.policies?.cod, mockProduct.policies.cod),
-      returnsDays: pickFirst(p.returnsDays, p.returnDays, p.policies?.returnsDays, mockProduct.policies.returnsDays),
-      warranty: pickFirst(p.warranty, p.policies?.warranty, mockProduct.policies.warranty),
+      cod: pickFirst(p.cod, p.cashOnDelivery, p.policies?.cod, false),
+      returnsDays: pickFirst(p.returnsDays, p.returnDays, p.policies?.returnsDays, 0),
+      warranty: pickFirst(p.warranty, p.policies?.warranty, ''),
     },
-    highlights: Array.isArray(p.highlights) ? p.highlights : [
-      metal ? `${String(metal)}` : 'Gold',
-      purity ? `Purity: ${String(purity)}` : 'Purity: 22K',
-      netWeight ? `Net Weight: ${String(netWeight)}` : 'Net Weight: -',
-      grossWeight ? `Gross Weight: ${String(grossWeight)}` : 'Gross Weight: -',
-    ],
+    highlights: Array.isArray(p.highlights) && p.highlights.length > 0 ? p.highlights : [
+      metal ? `${String(metal)}` : null,
+      purity ? `Purity: ${String(purity)}` : null,
+      netWeight ? `Net Weight: ${String(netWeight)}` : null,
+      grossWeight ? `Gross Weight: ${String(grossWeight)}` : null,
+    ].filter(Boolean), // Remove null/empty values
 
     details: {
       Metal: metal ? String(metal) : '',
@@ -322,7 +322,7 @@ const normalizeProduct = (raw) => {
     const s = String(v || '').trim();
     if (s) cleanedDetails[k === 'NetWeight' ? 'Net Weight' : k === 'GrossWeight' ? 'Gross Weight' : k] = s;
   });
-  normalized.details = Object.keys(cleanedDetails).length ? cleanedDetails : mockProduct.details;
+  normalized.details = Object.keys(cleanedDetails).length ? cleanedDetails : {};
 
   // ensure mrp is valid
   if (!normalized.mrp || normalized.mrp < normalized.price) normalized.mrp = normalized.price;
@@ -343,13 +343,62 @@ const ProductDetails = ({ route }) => {
     null;
 
   const [apiProduct, setApiProduct] = useState(() => normalizeProduct(productParam || mockProduct));
-  const [similar, setSimilar] = useState(route?.params?.similar || mockSimilar);
-  const [reviews, setReviews] = useState(route?.params?.reviews || mockReviews);
+  const [similar, setSimilar] = useState(route?.params?.similar || []);
+  const [reviews, setReviews] = useState(route?.params?.reviews || []);
   const [loading, setLoading] = useState(true);
 
   const [activeIndex, setActiveIndex] = useState(0);
   const [specsOpen, setSpecsOpen] = useState(false);
   const galleryRef = useRef(null);
+
+  // ==============================
+  // FETCH SIMILAR PRODUCTS (API)
+  // ==============================
+  const fetchSimilarProducts = async (category, excludeId) => {
+    try {
+      // Try different API endpoints for similar products
+      const endpoints = [
+        `${API_BASE}/api/products?category=${encodeURIComponent(category)}&limit=5`,
+        `${API_BASE}/api/products/related/${excludeId}`,
+        `${API_BASE}/api/products?metal=${encodeURIComponent(category)}&limit=5`,
+      ];
+
+      for (const endpoint of endpoints) {
+        try {
+          const res = await fetch(endpoint, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          
+          const data = await res.json().catch(() => ({}));
+          const products = data?.products || data?.items || data?.data || (Array.isArray(data) ? data : []);
+          
+          if (Array.isArray(products) && products.length > 0) {
+            // Filter out current product and normalize
+            const filtered = products
+              .filter(p => {
+                const pid = p._id || p.id || p.productId;
+                return pid && String(pid) !== String(excludeId);
+              })
+              .slice(0, 5); // Limit to 5 similar products
+            
+            const normalizedSimilar = filtered.map(item => normalizeProduct(item));
+            setSimilar(normalizedSimilar);
+            return; // Success, exit
+          }
+        } catch (err) {
+          console.log('Similar products endpoint failed:', endpoint, err);
+          continue; // Try next endpoint
+        }
+      }
+      
+      // If all endpoints fail, keep empty array (don't use mock)
+      setSimilar([]);
+    } catch (err) {
+      console.log('Error fetching similar products:', err);
+      setSimilar([]);
+    }
+  };
 
   // ==============================
   // FETCH PRODUCT BY ID (API)
@@ -363,7 +412,12 @@ const ProductDetails = ({ route }) => {
 
         // If no id, still show with passed product/mock (no infinite loading)
         if (!productId) {
-          setApiProduct(normalizeProduct(productParam || mockProduct));
+          const normalized = normalizeProduct(productParam || mockProduct);
+          setApiProduct(normalized);
+          // Try to fetch similar products even without productId
+          if (normalized.category || normalized.details?.Metal) {
+            fetchSimilarProducts(normalized.category || normalized.details?.Metal || 'gold', normalized.id);
+          }
           setLoading(false);
           return;
         }
@@ -404,8 +458,16 @@ const ProductDetails = ({ route }) => {
 
         setApiProduct(normalized);
 
-        // Similar & reviews: if backend sends, use it; else keep old mock arrays (UI stays same)
-        if (Array.isArray(data?.similarProducts)) setSimilar(data.similarProducts);
+        // Similar & reviews: if backend sends, use it; else fetch similar products
+        if (Array.isArray(data?.similarProducts) && data.similarProducts.length > 0) {
+          // Normalize similar products from API
+          const normalizedSimilar = data.similarProducts.map(item => normalizeProduct(item));
+          setSimilar(normalizedSimilar);
+        } else {
+          // Fetch similar products based on category or metal type
+          fetchSimilarProducts(normalized.category || normalized.details?.Metal || 'gold', normalized.id);
+        }
+        
         if (Array.isArray(data?.reviews)) setReviews(data.reviews);
 
         setLoading(false);
@@ -483,32 +545,51 @@ const ProductDetails = ({ route }) => {
     galleryRef.current?.scrollTo({ x: index * width, animated: true });
   };
 
-  const renderSimilarItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.similarCard}
-      onPress={() =>
-        navigation.navigate('ProductDetails', {
-          id: item?._id || item?.id,
-          product: item,
-        })
-      }
-    >
-      <Image source={{ uri: item.image }} style={styles.similarImage} />
-      <Text style={styles.similarName} numberOfLines={2}>
-        {item.name}
-      </Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <Text style={styles.similarPrice}>{currency(item.price)}</Text>
-        {item.mrp ? (
-          <Text style={styles.similarMrp}>{currency(item.mrp)}</Text>
-        ) : null}
-      </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <StarRow value={item.rating || 0} size={12} />
-        <Text style={styles.similarRating}>{(item.rating || 0).toFixed(1)}</Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const renderSimilarItem = ({ item }) => {
+    // Normalize the item to ensure it has proper structure
+    const normalizedItem = normalizeProduct(item);
+    
+    // Get image URL using buildImageUrl helper
+    const imageUrl = normalizedItem.image || normalizedItem.images?.[0] || null;
+    const displayImage = imageUrl ? buildImageUrl(imageUrl) : null;
+    
+    return (
+      <TouchableOpacity
+        style={styles.similarCard}
+        onPress={() =>
+          navigation.navigate('ProductDetails', {
+            id: normalizedItem.id,
+            product: normalizedItem,
+          })
+        }
+      >
+        {displayImage ? (
+          <Image 
+            source={{ uri: displayImage }} 
+            style={styles.similarImage}
+            onError={() => console.log('Image load error for:', displayImage)}
+          />
+        ) : (
+          <View style={[styles.similarImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
+            <Text style={{ color: '#999', fontSize: 12 }}>No Image</Text>
+          </View>
+        )}
+        <Text style={styles.similarName} numberOfLines={2}>
+          {normalizedItem.name || 'Product'}
+        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={styles.similarPrice}>{currency(normalizedItem.price || 0)}</Text>
+          {normalizedItem.mrp && normalizedItem.mrp > normalizedItem.price ? (
+            <Text style={styles.similarMrp}>{currency(normalizedItem.mrp)}</Text>
+          ) : null}
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <StarRow value={normalizedItem.rating || 0} size={12} />
+          <Text style={styles.similarRating}>{(normalizedItem.rating || 0).toFixed(1)}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   // ✅ Debug: Log product images for troubleshooting
   useEffect(() => {

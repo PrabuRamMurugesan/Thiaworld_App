@@ -1,6 +1,7 @@
 // HomeScreen.js — Thiaworld Jewellery Shop Model
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -89,6 +90,7 @@ const useMidnightCountdown = () => {
 // ------------------------------
 const Header = ({ navigation, cartCount, onSearchPress, onCartPress, onNotifPress }) => {
   const { colors } = useTheme();
+  const iconColor = colors?.text || '#000000';
   
   return (
     <View style={styles.headerContainer}>
@@ -108,7 +110,7 @@ const Header = ({ navigation, cartCount, onSearchPress, onCartPress, onNotifPres
           style={styles.iconWrapper} 
           onPress={() => navigation?.openDrawer?.()}
         >
-          <Icon name="menu" size={24} color={colors.text} />
+          <Icon name="menu" size={24} color={iconColor} />
         </TouchableOpacity>
 
         {/* Search Bar */}
@@ -132,11 +134,11 @@ const Header = ({ navigation, cartCount, onSearchPress, onCartPress, onNotifPres
         {/* Cart Icon */}
         <TouchableOpacity style={styles.iconWrapper} onPress={onCartPress}>
           <Image source={Cart} style={styles.icon} />
-          {cartCount > 0 && (
+          {cartCount && cartCount > 0 ? (
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>{cartCount}</Text>
+              <Text style={styles.badgeText}>{String(cartCount)}</Text>
             </View>
-          )}
+          ) : null}
         </TouchableOpacity>
       </View>
     </View>
@@ -218,8 +220,12 @@ const CategoryStrip = ({ categories, onPress }) => (
 const Section = ({ title, rightLabel, onRightPress, children }) => (
   <View style={styles.section}>
     <View style={styles.sectionHead}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {rightLabel ? <TouchableOpacity onPress={onRightPress}><Text style={styles.sectionAction}>{rightLabel}</Text></TouchableOpacity> : null}
+      {title ? <Text style={styles.sectionTitle}>{String(title)}</Text> : null}
+      {rightLabel ? (
+        <TouchableOpacity onPress={onRightPress}>
+          <Text style={styles.sectionAction}>{String(rightLabel)}</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
     {children}
   </View>
@@ -282,7 +288,7 @@ const ProductCard = ({ item, onPress, small }) => {
           <Text style={styles.mrp}>₹{item.mrp}</Text>
         </View>
         <Text style={styles.rating}>⭐ {item.rating}</Text>
-        {item.purity && <Text style={styles.purity}>Purity: {item.purity}</Text>}
+        {item.purity ? <Text style={styles.purity}>Purity: {item.purity}</Text> : null}
         <View style={styles.metaRow}>
           {item.badge ? <Text style={styles.badgeChip}>{item.badge}</Text> : null}
           {item.lowStock ? <Text style={styles.lowStock}>Low stock</Text> : null}
@@ -308,37 +314,171 @@ const DealsCard = ({ item, onPress }) => (
 );
 
 // ------------------------------
-// Trust Strip
+// Bottom Navigation Bar
 // ------------------------------
-const TrustItem = ({ emoji, text, onPress }) => (
-  <TouchableOpacity style={styles.trustItem} onPress={onPress} activeOpacity={0.7}>
-    <Text style={styles.trustEmoji}>{emoji}</Text>
-    <Text style={styles.trustText}>{text}</Text>
-  </TouchableOpacity>
-);
+const BottomNavItem = ({ iconName, text, onPress, isActive, iconColor, textColor, badge }) => {
+  // Validate and sanitize all inputs
+  const badgeCount = (badge !== undefined && badge !== null && typeof badge === 'number') ? Math.max(0, badge) : 0;
+  const showBadge = badgeCount > 0;
+  
+  // Ensure text is always a valid string (never undefined/null)
+  const displayText = (text !== undefined && text !== null) ? String(text) : '';
+  
+  // Ensure colors are valid strings (never undefined/null)
+  const validIconColor = (iconColor && typeof iconColor === 'string') ? iconColor : '#999999';
+  const validTextColor = (textColor && typeof textColor === 'string') ? textColor : '#999999';
+  
+  // Ensure iconName is valid
+  const validIconName = (iconName && typeof iconName === 'string') ? iconName : 'help-circle-outline';
+  
+  // Ensure onPress is a function
+  const handlePress = typeof onPress === 'function' ? onPress : () => {};
+  
+  return (
+    <TouchableOpacity 
+      style={styles.bottomNavItem} 
+      onPress={handlePress} 
+      activeOpacity={0.7}
+    >
+      {isActive === true && validIconColor ? (
+        <View style={[styles.activeIndicator, { backgroundColor: validIconColor }]} />
+      ) : null}
+      <View style={styles.iconContainer}>
+        <Icon 
+          name={validIconName} 
+          size={24} 
+          color={validIconColor} 
+          style={styles.bottomNavIcon}
+        />
+        {showBadge === true && badgeCount > 0 ? (
+          <View style={styles.badgeContainer}>
+            <Text style={styles.badgeText}>{badgeCount > 99 ? '99+' : String(badgeCount)}</Text>
+          </View>
+        ) : null}
+      </View>
+      {displayText && displayText.length > 0 ? (
+        <Text style={[styles.bottomNavText, { color: validTextColor }]}>{displayText}</Text>
+      ) : null}
+    </TouchableOpacity>
+  );
+};
 
-const TrustStrip = ({ navigation }) => (
-  <View style={styles.trust}>
-    <TrustItem emoji="📈" text="Daily Rate" onPress={() => navigation.navigate('Ratings')} />
-    <TrustItem emoji="🏛️" text="Dashboard" onPress={() => navigation.navigate('Dashboard')} />
-    <TrustItem emoji="🔒" text="ThiaSecurePlan" onPress={() => navigation.navigate('ThiaSecurePlan')} />
-    <TrustItem emoji="👤" text="User Account" onPress={() => navigation.navigate('Account')} />
-    <TrustItem emoji="💎" text="About Us" onPress={() => navigation.navigate('AboutUs')} />
-
-
-  </View>
-);
+function BottomNavigationBar({ navigation, currentRoute }) {
+  const { colors } = useTheme();
+  const { cartCount } = useCart();
+  
+  // Gold/primary color for active state, appropriate for jewellery app
+  const activeColor = colors.primary || '#B8860B';
+  const inactiveColor = '#999999';
+  const activeTextColor = activeColor;
+  const inactiveTextColor = inactiveColor;
+  
+  // Ensure cartCount is a valid number
+  const validCartCount = cartCount && typeof cartCount === 'number' ? cartCount : 0;
+  
+  const navItems = [
+    {
+      key: 'DailyRate',
+      icon: 'trending-up',
+      iconOutline: 'trending-up',
+      text: 'Daily Rate',
+      route: 'Ratings',
+      badge: undefined,
+    },
+    {
+      key: 'Dashboard',
+      icon: 'business',
+      iconOutline: 'business-outline',
+      text: 'Dashboard',
+      route: 'Dashboard',
+      badge: undefined,
+    },
+    {
+      key: 'ThiaSecurePlan',
+      icon: 'lock-closed',
+      iconOutline: 'lock-closed-outline',
+      text: 'ThiaSecurePlan',
+      route: 'ThiaSecurePlan',
+      badge: undefined,
+    },
+    {
+      key: 'UserAccount',
+      icon: 'person',
+      iconOutline: 'person-outline',
+      text: 'User Account',
+      route: 'Account',
+      badge: undefined,
+    },
+    {
+      key: 'AboutUs',
+      icon: 'information-circle',
+      iconOutline: 'information-circle-outline',
+      text: 'About Us',
+      route: 'AboutUs',
+      badge: undefined,
+    },
+  ].filter(item => item && item.key && item.text && item.route); // Filter out any invalid items
+  
+  const handleNavigate = (route) => {
+    if (navigation && navigation.navigate) {
+      navigation.navigate(route);
+    }
+  };
+  
+  return (
+    <View style={styles.bottomNavBar}>
+      {navItems.map((item) => {
+        // Check if current route matches this item's route or key
+        const routeMatch = currentRoute === item.route || currentRoute === item.key;
+        // Also check if we're on HomeMain and this is the first item (DailyRate)
+        const isHomeAndFirst = (currentRoute === 'HomeMain' || currentRoute === 'Home') && item.key === 'DailyRate';
+        const isActive = routeMatch || isHomeAndFirst;
+        
+        const iconName = isActive ? (item.icon || 'help-circle-outline') : (item.iconOutline || 'help-circle-outline');
+        const iconColor = isActive ? activeColor : inactiveColor;
+        const textColor = isActive ? activeTextColor : inactiveTextColor;
+        
+        // Ensure all props are valid
+        const safeText = item.text ? String(item.text) : '';
+        const safeBadge = item.badge !== undefined && item.badge !== null ? Number(item.badge) : 0;
+        
+        return (
+          <BottomNavItem
+            key={item.key || 'nav-item'}
+            iconName={iconName}
+            text={safeText}
+            onPress={() => handleNavigate(item.route)}
+            isActive={isActive}
+            iconColor={iconColor}
+            textColor={textColor}
+            badge={safeBadge}
+          />
+        );
+      })}
+    </View>
+  );
+}
 
 // ------------------------------
 // HomeScreen
 // ------------------------------
-export default function HomeScreen({ navigation }) {
+export default function HomeScreen({ navigation, route }) {
   const { cartCount, cartReady } = useCart();
   const { colors, isDark } = useTheme();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [currentRoute, setCurrentRoute] = useState('DailyRate');
+  
+  // Track current route for bottom navigation
+  useFocusEffect(
+    useCallback(() => {
+      // Get current route name from navigation state
+      const routeName = route?.name || navigation?.getState?.()?.routes?.[navigation?.getState?.()?.index]?.name || 'DailyRate';
+      setCurrentRoute(routeName);
+    }, [route, navigation])
+  );
 
   const countdown = useMidnightCountdown();
   useEffect(() => {
@@ -387,7 +527,7 @@ export default function HomeScreen({ navigation }) {
   }, []);
   useEffect(() => {
     axios
-      .get("https://thiaworld.bbscart.com/api/products/best-selling")
+      .get("https://thiaworld.bbscart.com/api/products/new-arrivals")
       .then((res) => {
         PRODUCTS_RECO.length = 0;
 
@@ -409,11 +549,12 @@ export default function HomeScreen({ navigation }) {
               ? `https://thiaworld.bbscart.com/uploads/${p.images[0].split("|")[0]}`
               : "https://via.placeholder.com/150",
             purity: p.purity || "916",
+            badge: p.discount ? 'New' : null,
           });
         });
       })
       .catch((err) => {
-        console.log("Best selling API error", err);
+        console.log("New arrivals (Recommended) API error", err);
       });
   }, []);
   useEffect(() => {
@@ -544,6 +685,7 @@ export default function HomeScreen({ navigation }) {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <ScrollView
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        contentContainerStyle={{ paddingBottom: 80 }}
       >
         <Header
           navigation={navigation}
@@ -582,8 +724,8 @@ export default function HomeScreen({ navigation }) {
         <Section title="Recommended For You" rightLabel="View all" onRightPress={() => navigate('Products')}>
           {renderHorizontal(PRODUCTS_RECO, (p) => <ProductCard key={p.id} item={p} onPress={onProductPress} small />)}
         </Section>
-        <TrustStrip navigation={navigation} />
       </ScrollView>
+      <BottomNavigationBar navigation={navigation} currentRoute={currentRoute} />
     </SafeAreaView>
   );
 }
@@ -632,10 +774,70 @@ const styles = StyleSheet.create({
   badgeChip: { backgroundColor: '#FFD700', paddingHorizontal: 6, borderRadius: 10, fontSize: 10, marginRight: 4 },
   lowStock: { color: 'red', fontSize: 11 },
   discountTag: { color: 'green', fontWeight: 'bold', marginTop: 2 },
-  trust: { flexDirection: 'row', justifyContent: 'space-around', padding: 12, backgroundColor: '#f9f9f9', marginTop: 16 },
-  trustItem: { alignItems: 'center' },
-  trustEmoji: { fontSize: 22 },
-  trustText: { fontSize: 12, marginTop: 4 },
+  bottomNavBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    paddingVertical: 8,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 8,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  bottomNavItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4,
+    position: 'relative',
+  },
+  activeIndicator: {
+    position: 'absolute',
+    top: 0,
+    width: 20,
+    height: 3,
+    borderRadius: 2,
+  },
+  iconContainer: {
+    position: 'relative',
+    marginBottom: 2,
+  },
+  bottomNavIcon: {
+    // Icon styling handled by Icon component
+  },
+  badgeContainer: {
+    position: 'absolute',
+    top: -6,
+    right: -8,
+    backgroundColor: '#FF3B30',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: '#ffffff',
+  },
+  badgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  bottomNavText: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
+  },
   skeletonBanner: { width: '100%', height: 160, backgroundColor: '#eee', marginVertical: 12 },
   skeletonRow: { width: '90%', height: 80, backgroundColor: '#eee', marginHorizontal: '5%', marginVertical: 8, borderRadius: 8 },
   errorBox: { flex: 1, justifyContent: 'center', alignItems: 'center' },
